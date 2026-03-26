@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #f7f9fc;
+  color: #0f172a;
+  font-family: var(--font-body), sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.field {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid #d7e0ee;
+  background: #fff;
+  padding: 0.95rem 1rem;
+  color: #0f172a;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.field:focus {
+  border-color: #2252e8;
+  box-shadow: 0 0 0 4px rgba(34, 82, 232, 0.12);
+}
+
+.field::placeholder {
+  color: #7b8798;
+}
+
+.admin-field {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.95rem 1rem;
+  color: white;
+  outline: none;
+}
+
+.admin-field::placeholder {
+  color: #94a3b8;
+}
+
+.scrollbar-hide {
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
