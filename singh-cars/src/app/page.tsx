@@ -1,13 +1,8 @@
-import { HomeSections } from "@/components/public/home-sections";
-import { SiteShell } from "@/components/public/site-shell";
-import { getFeaturedListings } from "@/lib/data";
-
-export default async function HomePage() {
-  const featuredListings = await getFeaturedListings(3);
-
+export default function Home() {
   return (
-    <SiteShell currentPath="/">
-      <HomeSections featuredListings={featuredListings} />
-    </SiteShell>
+    <main style={{ padding: 40 }}>
+      <h1>Homepage working</h1>
+      <p>Singh Car Bazar test page</p>
+    </main>
   );
 }
