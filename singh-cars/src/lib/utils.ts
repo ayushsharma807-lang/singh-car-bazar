@@ -10,6 +10,17 @@ export function formatNumber(value: number) {
   return new Intl.NumberFormat("en-IN").format(value);
 }
 
+export function formatDateTime(value?: string | null) {
+  if (!value) {
+    return "No update time";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
 export function createSlug(...parts: Array<string | number | null | undefined>) {
   return parts
     .filter(Boolean)

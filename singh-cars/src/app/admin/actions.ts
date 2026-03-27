@@ -196,6 +196,6 @@ export async function saveListingAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/inventory");
   revalidatePath("/admin");
-  revalidatePath("/admin/listings");
-  redirect("/admin/listings");
+  revalidatePath("/admin/files");
+  redirect("/admin/files");
 }

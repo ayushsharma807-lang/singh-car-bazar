@@ -8,12 +8,12 @@ import { getListingById } from "@/lib/data";
 import { formatNumber, formatPrice } from "@/lib/utils";
 
 type CarDetailPageProps = {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ id: string }>;
 };
 
 export default async function CarDetailPage({ params }: CarDetailPageProps) {
-  const { slug } = await params;
-  const listing = await getListingById(slug);
+  const { id } = await params;
+  const listing = await getListingById(id);
 
   if (!listing) {
     notFound();

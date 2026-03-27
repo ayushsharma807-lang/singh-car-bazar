@@ -1,10 +1,5 @@
-import { AdminShell } from "@/components/admin/admin-shell";
-import { ListingForm } from "@/components/admin/listing-form";
+import { redirect } from "next/navigation";
 
-export default function NewListingPage() {
-  return (
-    <AdminShell title="Add Car Listing">
-      <ListingForm />
-    </AdminShell>
-  );
+export default function LegacyNewListingRedirect() {
+  redirect("/admin/files/new");
 }

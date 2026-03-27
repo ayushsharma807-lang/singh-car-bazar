@@ -1,7 +1,13 @@
 import { demoInquiries, demoListings } from "@/lib/demo-data";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { Inquiry, InventoryFilters, Listing } from "@/types";
+import type {
+  AdminFileRecord,
+  DealerDashboardSummary,
+  Inquiry,
+  InventoryFilters,
+  Listing,
+} from "@/types";
 
 type ListingRow = {
   id: string;
@@ -297,16 +303,112 @@ export async function getAdminListings(filters: {
   });
 }
 
-export async function getDashboardSummary() {
-  const listings = await getAdminListings();
-  const inquiries = await getInquiries();
+function inferDocumentStatus(listing: Listing) {
+  const sellerReady = listing.documents.some((document) =>
+    ["rc", "insurance", "seller_id"].includes(document.docType),
+  );
+  const carReady = Boolean(listing.coverImageUrl || listing.images.length);
+  const buyerReady = listing.documents.some((document) =>
+    ["buyer_id", "loan_noc", "other"].includes(document.docType),
+  );
 
   return {
-    totalCars: listings.length,
-    availableCars: listings.filter((listing) => listing.status === "available")
-      .length,
-    soldCars: listings.filter((listing) => listing.status === "sold").length,
-    recentInquiries: inquiries.slice(0, 5),
+    sellerReady,
+    carReady,
+    buyerReady,
+  };
+}
+
+function inferStage(listing: Listing): "seller" | "car" | "buyer" {
+  if (listing.buyer?.name || listing.status === "sold") {
+    return "buyer";
+  }
+
+  const docs = inferDocumentStatus(listing);
+  if (docs.sellerReady || docs.carReady) {
+    return "car";
+  }
+
+  return "seller";
+}
+
+function toAdminFileRecord(listing: Listing): AdminFileRecord {
+  return {
+    id: listing.id,
+    fileNumber: listing.stockNumber,
+    carName: `${listing.make} ${listing.model}${listing.variant ? ` ${listing.variant}` : ""}`,
+    numberPlate: listing.numberPlate,
+    sellerName: listing.seller?.name ?? "Unknown Seller",
+    sellerPhone: listing.seller?.phone ?? null,
+    buyerName: listing.buyer?.name ?? null,
+    buyerPhone: listing.buyer?.phone ?? null,
+    status: listing.status,
+    sellerType: listing.sellerType,
+    updatedAt: listing.updatedAt ?? listing.createdAt,
+    stage: inferStage(listing),
+    documentStatus: inferDocumentStatus(listing),
+    listing,
+  };
+}
+
+export async function getAdminFiles(filters: {
+  query?: string;
+  status?: string;
+  sellerType?: string;
+} = {}) {
+  const listings = await getAdminListings({
+    search: filters.query,
+    status: filters.status,
+    sellerType: filters.sellerType,
+  });
+
+  return listings
+    .map(toAdminFileRecord)
+    .filter((file) => {
+      if (!filters.query) {
+        return true;
+      }
+
+      const query = filters.query.toLowerCase();
+      const haystack = [
+        file.fileNumber,
+        file.numberPlate,
+        file.carName,
+        file.sellerName,
+        file.sellerPhone ?? "",
+        file.buyerName ?? "",
+        file.buyerPhone ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+}
+
+export async function getAdminFileById(id: string) {
+  const files = await getAdminFiles();
+  return files.find((file) => file.id === id) ?? null;
+}
+
+export async function getDashboardSummary(): Promise<DealerDashboardSummary> {
+  const files = await getAdminFiles();
+
+  return {
+    totalFiles: files.length,
+    carsInStock: files.filter((file) => file.status === "available").length,
+    soldCars: files.filter((file) => file.status === "sold").length,
+    filesMissingBuyerDocuments: files.filter(
+      (file) => !file.documentStatus.buyerReady,
+    ).length,
+    filesMissingSellerDocuments: files.filter(
+      (file) => !file.documentStatus.sellerReady,
+    ).length,
+    recentFiles: [...files]
+      .sort((a, b) =>
+        new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime(),
+      )
+      .slice(0, 6),
   };
 }
 

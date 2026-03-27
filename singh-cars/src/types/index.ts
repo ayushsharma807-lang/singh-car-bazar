@@ -82,3 +82,37 @@ export type InventoryFilters = {
   year?: string;
   price?: string;
 };
+
+export type FileWorkflowStage = "seller" | "car" | "buyer";
+
+export type FileDocumentStatus = {
+  sellerReady: boolean;
+  carReady: boolean;
+  buyerReady: boolean;
+};
+
+export type AdminFileRecord = {
+  id: string;
+  fileNumber: string;
+  carName: string;
+  numberPlate: string;
+  sellerName: string;
+  sellerPhone?: string | null;
+  buyerName?: string | null;
+  buyerPhone?: string | null;
+  status: ListingStatus;
+  sellerType: SellerType;
+  updatedAt?: string;
+  stage: FileWorkflowStage;
+  documentStatus: FileDocumentStatus;
+  listing: Listing;
+};
+
+export type DealerDashboardSummary = {
+  totalFiles: number;
+  carsInStock: number;
+  soldCars: number;
+  filesMissingBuyerDocuments: number;
+  filesMissingSellerDocuments: number;
+  recentFiles: AdminFileRecord[];
+};
