@@ -38,18 +38,18 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
               key={stage}
               type="button"
               onClick={() => setActiveStage(stage)}
-              className={`flex items-center gap-3 rounded-[24px] border px-4 py-4 text-left shadow-sm transition ${
+              className={`flex items-center gap-3 rounded-xl border px-4 py-4 text-left shadow-sm transition ${
                 isActive
-                  ? "border-sky-200 bg-[linear-gradient(180deg,#eff6ff_0%,#ffffff_100%)]"
-                  : "border-sky-100 bg-white hover:bg-sky-50/50"
+                  ? "border-gray-300 bg-gray-50"
+                  : "border-gray-200 bg-white hover:bg-gray-50"
               }`}
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-black">
                 <Icon className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tab</p>
-                <p className="text-sm font-semibold text-slate-900">{stageMeta[stage].label}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Tab</p>
+                <p className="text-sm font-semibold text-black">{stageMeta[stage].label}</p>
               </div>
             </button>
           );
@@ -58,8 +58,8 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
 
       {activeStage === "seller" ? (
         <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-900">Seller information</h2>
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-black">Seller information</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <InfoRow label="Seller name" value={file.listing.seller?.name} />
               <InfoRow label="Phone" value={file.listing.seller?.phone} />
@@ -84,8 +84,8 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
 
       {activeStage === "car" ? (
         <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-900">Car details</h2>
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-black">Car details</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <InfoRow label="File number" value={file.fileNumber} />
               <InfoRow label="Number plate" value={file.numberPlate} />
@@ -113,8 +113,8 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
 
       {activeStage === "buyer" ? (
         <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-900">Buyer information</h2>
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-black">Buyer information</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <InfoRow label="Buyer name" value={file.listing.buyer?.name} />
               <InfoRow label="Phone" value={file.listing.buyer?.phone} />
@@ -136,8 +136,8 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
 
       {activeStage === "documents" ? (
         <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-          <div className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-900">Document check</h2>
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-black">Document check</h2>
             <div className="mt-4 grid gap-3">
               <StageBadge label="Seller Docs" ready={file.documentStatus.sellerReady} />
               <StageBadge label="Car Docs" ready={file.documentStatus.carReady} />
@@ -145,15 +145,15 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
             </div>
             <Link
               href={`/admin/files/${file.id}/edit`}
-              className="mt-5 inline-flex rounded-full bg-[#2252e8] px-5 py-3 text-sm font-semibold text-white"
+              className="mt-5 inline-flex rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white"
             >
               Upload Docs
             </Link>
           </div>
-          <div className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-base font-semibold text-slate-900">All uploaded documents</h2>
-              <span className="text-sm text-slate-500">{file.listing.documents.length} file(s)</span>
+              <h2 className="text-base font-semibold text-black">All uploaded documents</h2>
+              <span className="text-sm text-gray-500">{file.listing.documents.length} file(s)</span>
             </div>
             <div className="mt-4 grid gap-3">
               {file.listing.documents.length ? (
@@ -163,13 +163,13 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                     href={document.fileUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-2xl border border-sky-100 bg-sky-50/60 px-4 py-3 text-sm text-slate-700 hover:bg-sky-100"
+                    className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 hover:bg-gray-50"
                   >
                     {document.docType}
                   </a>
                 ))
               ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-sm text-slate-500">
+                <div className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500">
                   No documents uploaded yet.
                 </div>
               )}
@@ -197,12 +197,12 @@ function DocPanel({
   );
 
   return (
-    <div className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+        <h2 className="text-base font-semibold text-black">{title}</h2>
         <span
-          className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
-            ready ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+          className={`rounded-xl border px-3 py-1 text-xs font-semibold ${
+            ready ? "border-gray-200 bg-white text-black" : "border-gray-300 bg-gray-100 text-gray-800"
           }`}
         >
           {ready ? "Ready" : "Needs update"}
@@ -216,13 +216,13 @@ function DocPanel({
               href={document.fileUrl}
               target="_blank"
               rel="noreferrer"
-              className="rounded-2xl border border-sky-100 bg-sky-50/60 px-4 py-3 text-sm text-slate-700 hover:bg-sky-100"
+              className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 hover:bg-gray-50"
             >
               {document.docType}
             </a>
           ))
         ) : (
-          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-sm text-slate-500">
+          <div className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500">
             No documents uploaded yet for this stage.
           </div>
         )}
@@ -234,8 +234,8 @@ function DocPanel({
 function StageBadge({ label, ready }: { label: string; ready: boolean }) {
   return (
     <div
-      className={`rounded-[20px] px-4 py-3 text-sm font-semibold ${
-        ready ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+      className={`rounded-xl border px-4 py-3 text-sm font-semibold ${
+        ready ? "border-gray-200 bg-white text-black" : "border-gray-300 bg-gray-100 text-gray-800"
       }`}
     >
       {label}: {ready ? "Ready" : "Missing"}

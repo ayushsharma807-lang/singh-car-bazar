@@ -38,9 +38,9 @@ export function AdminLoginForm() {
   return (
     <form
       action={handleSubmit}
-      className="mx-auto grid max-w-md gap-4 rounded-[28px] border border-slate-200 bg-white p-8 shadow-[0_25px_80px_rgba(15,23,42,0.08)]"
+      className="mx-auto grid max-w-md gap-4 rounded-xl border border-gray-200 bg-white p-8 shadow-sm"
     >
-      <h1 className="font-display text-4xl uppercase tracking-[0.08em] text-slate-900">
+      <h1 className="text-3xl font-semibold text-black">
         Admin Login
       </h1>
       <input className="field" type="email" name="email" placeholder="Admin email" required />
@@ -49,7 +49,7 @@ export function AdminLoginForm() {
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-full bg-[#2252e8] px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white disabled:opacity-70"
+        className="rounded-xl bg-black px-6 py-3 text-sm font-semibold text-white disabled:opacity-70"
       >
         {isPending ? "Signing In..." : "Sign In"}
       </button>

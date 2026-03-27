@@ -51,20 +51,20 @@ function StepButton({
     <button
       type="button"
       onClick={() => onClick(step)}
-      className={`rounded-[24px] border px-5 py-4 text-left transition ${
+      className={`rounded-xl border px-5 py-4 text-left transition ${
         isActive
-          ? "border-sky-300 bg-sky-50 shadow-sm"
-          : "border-sky-100 bg-white hover:border-sky-200 hover:bg-sky-50/60"
+          ? "border-gray-300 bg-gray-50 shadow-sm"
+          : "border-gray-200 bg-white hover:bg-gray-50"
       }`}
     >
-      <p className="text-base font-semibold text-slate-900">{stepMeta[step].title}</p>
-      <p className="mt-1 text-sm text-slate-600">{stepMeta[step].text}</p>
+      <p className="text-base font-semibold text-black">{stepMeta[step].title}</p>
+      <p className="mt-1 text-sm text-gray-600">{stepMeta[step].text}</p>
     </button>
   );
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <span className="mb-2 block text-sm font-semibold text-slate-800">{children}</span>;
+  return <span className="mb-2 block text-sm font-semibold text-gray-800">{children}</span>;
 }
 
 function NextStepButton({
@@ -85,7 +85,7 @@ function NextStepButton({
     <button
       type="button"
       onClick={() => setStep(nextStep)}
-      className="rounded-full bg-[#2252e8] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
+      className="rounded-xl bg-black px-6 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
     >
       Next
     </button>
@@ -100,7 +100,7 @@ export function ListingForm({ listing }: ListingFormProps) {
   return (
     <form
       action={saveListingAction}
-      className="grid gap-5 rounded-[32px] border border-sky-100 bg-white p-5 shadow-sm lg:p-6"
+      className="grid gap-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm lg:p-6"
     >
       <input type="hidden" name="listingId" value={listing?.id ?? ""} />
 
@@ -111,9 +111,9 @@ export function ListingForm({ listing }: ListingFormProps) {
       </div>
 
       {step === "seller" ? (
-        <section className="rounded-[28px] border border-sky-100 bg-sky-50/40 p-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#ff8a2e]">Seller</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Who is giving this car?</h2>
+        <section className="rounded-xl border border-gray-200 bg-white p-5">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500">Seller</p>
+          <h2 className="mt-2 text-2xl font-semibold text-black">Who is giving this car?</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label>
               <FieldLabel>Seller Type</FieldLabel>
@@ -144,8 +144,8 @@ export function ListingForm({ listing }: ListingFormProps) {
             </label>
           </div>
 
-          <details className="mt-5 rounded-[22px] border border-sky-100 bg-white p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-sky-700">More details</summary>
+          <details className="mt-5 rounded-xl border border-gray-200 bg-white p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-black">More details</summary>
             <div className="mt-4 grid gap-4">
               <label>
                 <FieldLabel>Address</FieldLabel>
@@ -175,9 +175,9 @@ export function ListingForm({ listing }: ListingFormProps) {
       ) : null}
 
       {step === "car" ? (
-        <section className="rounded-[28px] border border-sky-100 bg-sky-50/40 p-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#ff8a2e]">Car</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Add the car details</h2>
+        <section className="rounded-xl border border-gray-200 bg-white p-5">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500">Car</p>
+          <h2 className="mt-2 text-2xl font-semibold text-black">Add the car details</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label>
               <FieldLabel>Make</FieldLabel>
@@ -221,8 +221,8 @@ export function ListingForm({ listing }: ListingFormProps) {
             </label>
           </div>
 
-          <details className="mt-5 rounded-[22px] border border-sky-100 bg-white p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-sky-700">More details</summary>
+          <details className="mt-5 rounded-xl border border-gray-200 bg-white p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-black">More details</summary>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <label>
                 <FieldLabel>File Number</FieldLabel>
@@ -272,7 +272,7 @@ export function ListingForm({ listing }: ListingFormProps) {
                   <option value="sold">Sold</option>
                 </select>
               </label>
-              <label className="flex items-center gap-3 rounded-[18px] border border-sky-100 bg-sky-50/50 px-4 py-4 text-sm font-medium text-slate-700">
+              <label className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-4 text-sm font-medium text-gray-800">
                 <input type="checkbox" name="featured" defaultChecked={listing?.featured ?? false} />
                 Show in featured cars
               </label>
@@ -283,7 +283,7 @@ export function ListingForm({ listing }: ListingFormProps) {
             <button
               type="button"
               onClick={() => setStep("seller")}
-              className="rounded-full border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-gray-50"
             >
               Back
             </button>
@@ -293,22 +293,22 @@ export function ListingForm({ listing }: ListingFormProps) {
       ) : null}
 
       {step === "save" ? (
-        <section className="rounded-[28px] border border-sky-100 bg-sky-50/40 p-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#ff8a2e]">Save</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Save this car file</h2>
+        <section className="rounded-xl border border-gray-200 bg-white p-5">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500">Save</p>
+          <h2 className="mt-2 text-2xl font-semibold text-black">Save this car file</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <div className="rounded-[22px] border border-sky-100 bg-white p-4">
-              <p className="text-sm font-semibold text-slate-900">Seller</p>
-              <p className="mt-2 text-sm text-slate-600">Name, phone, and seller type are saved in one file.</p>
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <p className="text-sm font-semibold text-black">Seller</p>
+              <p className="mt-2 text-sm text-gray-600">Name, phone, and seller type are saved in one file.</p>
             </div>
-            <div className="rounded-[22px] border border-sky-100 bg-white p-4">
-              <p className="text-sm font-semibold text-slate-900">Car</p>
-              <p className="mt-2 text-sm text-slate-600">Main car details and photos are ready to save.</p>
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <p className="text-sm font-semibold text-black">Car</p>
+              <p className="mt-2 text-sm text-gray-600">Main car details and photos are ready to save.</p>
             </div>
           </div>
 
-          <details className="mt-5 rounded-[22px] border border-sky-100 bg-white p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-sky-700">Buyer and documents</summary>
+          <details className="mt-5 rounded-xl border border-gray-200 bg-white p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-black">Buyer and documents</summary>
             <div className="mt-4 grid gap-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <label>
@@ -335,7 +335,7 @@ export function ListingForm({ listing }: ListingFormProps) {
 
               <div className="grid gap-4 md:grid-cols-2">
                 {documentFields.map((field) => (
-                  <label key={field.name} className="rounded-[20px] border border-sky-100 bg-sky-50/40 p-4">
+                  <label key={field.name} className="rounded-xl border border-gray-200 bg-white p-4">
                     <FieldLabel>{field.label}</FieldLabel>
                     <input className="admin-field h-14 px-4 py-3" type="file" name={field.name} />
                     <input className="admin-field mt-3 h-14" name={`${field.name}_notes`} placeholder={`${field.label} notes`} />
@@ -349,20 +349,20 @@ export function ListingForm({ listing }: ListingFormProps) {
             <button
               type="button"
               onClick={() => setStep("car")}
-              className="rounded-full border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-gray-50"
             >
               Back
             </button>
             <div className="flex flex-wrap gap-3">
               <button
                 type="submit"
-                className="rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-gray-50"
               >
                 {isEditing ? "Save Changes" : "Save Car"}
               </button>
               <button
                 type="submit"
-                className="rounded-full bg-[#2252e8] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
+                className="rounded-xl bg-black px-6 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
               >
                 {isEditing ? "Save and Close" : "Add Car"}
               </button>

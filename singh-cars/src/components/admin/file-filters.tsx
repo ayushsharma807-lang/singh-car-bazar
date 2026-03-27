@@ -27,13 +27,13 @@ export function FileFilters({
       <div className="flex gap-3">
         <button
           type="submit"
-          className="flex-1 rounded-full bg-[#2252e8] px-5 py-3 text-sm font-semibold text-white"
+          className="flex-1 rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white"
         >
           Search
         </button>
         <Link
           href="/admin/files"
-          className="rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700"
+          className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-black"
         >
           Reset
         </Link>

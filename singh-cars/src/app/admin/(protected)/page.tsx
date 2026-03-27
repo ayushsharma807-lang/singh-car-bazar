@@ -18,17 +18,17 @@ export default async function AdminDashboardPage() {
       </div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-        <section className="rounded-[30px] border border-sky-100 bg-white p-6 shadow-sm">
+        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#ff8a2e]">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gray-500">
                 Recently Updated Files
               </p>
-              <h2 className="mt-2 text-xl font-semibold text-slate-900">
+              <h2 className="mt-2 text-xl font-semibold text-black">
                 Open the car files you changed last
               </h2>
             </div>
-            <Link href="/admin/files" className="inline-flex items-center gap-2 text-sm font-semibold text-sky-700">
+            <Link href="/admin/files" className="inline-flex items-center gap-2 text-sm font-semibold text-black">
               View all <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -36,10 +36,10 @@ export default async function AdminDashboardPage() {
         </section>
 
         <div className="grid gap-5">
-          <section className="rounded-[30px] border border-sky-100 bg-white p-6 shadow-sm">
+          <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
-              <FolderClock className="h-5 w-5 text-sky-600" />
-              <h2 className="text-lg font-semibold text-slate-900">How one car file works</h2>
+              <FolderClock className="h-5 w-5 text-black" />
+              <h2 className="text-lg font-semibold text-black">How one car file works</h2>
             </div>
             <div className="mt-5 grid gap-3">
               {[
@@ -47,18 +47,18 @@ export default async function AdminDashboardPage() {
                 ["Car", "Add the car details, number plate, price, and photos."],
                 ["Buyer", "When sold, add buyer details and buyer papers."],
               ].map(([title, description]) => (
-                <div key={title} className="rounded-[22px] border border-sky-100 bg-sky-50/50 p-4">
-                  <p className="font-semibold text-slate-900">{title}</p>
-                  <p className="mt-1 text-sm text-slate-600">{description}</p>
+                <div key={title} className="rounded-xl border border-gray-200 bg-white p-4">
+                  <p className="font-semibold text-black">{title}</p>
+                  <p className="mt-1 text-sm text-gray-600">{description}</p>
                 </div>
               ))}
             </div>
           </section>
 
-          <section className="rounded-[30px] border border-sky-100 bg-white p-6 shadow-sm">
+          <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
-              <UserRoundSearch className="h-5 w-5 text-[#ff8a2e]" />
-              <h2 className="text-lg font-semibold text-slate-900">What needs attention</h2>
+              <UserRoundSearch className="h-5 w-5 text-black" />
+              <h2 className="text-lg font-semibold text-black">What needs attention</h2>
             </div>
             <div className="mt-5 grid gap-3">
               <FocusItem
@@ -98,18 +98,18 @@ function StatCard({
   const tones = {
     blue: "bg-blue-50 text-blue-700",
     green: "bg-emerald-50 text-emerald-700",
-    orange: "bg-orange-50 text-orange-700",
-    sky: "bg-sky-50 text-sky-700",
-    amber: "bg-amber-50 text-amber-700",
+    orange: "bg-white text-black border border-gray-200",
+    sky: "bg-white text-black border border-gray-200",
+    amber: "bg-white text-black border border-gray-200",
   } as const;
 
   return (
-    <article className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-sm">
-      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${tones[accent]}`}>
+    <article className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <span className={`inline-flex rounded-xl px-3 py-1 text-xs font-semibold ${tones[accent]}`}>
         {label}
       </span>
-      <p className="mt-4 text-4xl font-semibold text-slate-900">{value}</p>
-      <p className="mt-2 text-sm text-slate-500">{hint}</p>
+      <p className="mt-4 text-4xl font-semibold text-black">{value}</p>
+      <p className="mt-2 text-sm text-gray-500">{hint}</p>
     </article>
   );
 }
@@ -124,12 +124,12 @@ function FocusItem({
   text: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-sky-100 bg-sky-50/50 p-4">
+    <div className="rounded-xl border border-gray-200 bg-white p-4">
       <div className="flex items-center gap-2">
         {icon}
-        <p className="font-semibold text-slate-900">{title}</p>
+        <p className="font-semibold text-black">{title}</p>
       </div>
-      <p className="mt-2 text-sm text-slate-600">{text}</p>
+      <p className="mt-2 text-sm text-gray-600">{text}</p>
     </div>
   );
 }

@@ -16,8 +16,8 @@ html {
 
 body {
   margin: 0;
-  background: #f7f9fc;
-  color: #0f172a;
+  background: #ffffff;
+  color: #111827;
   font-family: var(--font-body), sans-serif;
 }
 
@@ -35,11 +35,11 @@ textarea {
 
 .field {
   width: 100%;
-  border-radius: 18px;
-  border: 1px solid #d7e0ee;
+  border-radius: 0.75rem;
+  border: 1px solid #d1d5db;
   background: #fff;
   padding: 0.95rem 1rem;
-  color: #0f172a;
+  color: #111827;
   outline: none;
   transition:
     border-color 0.2s ease,
@@ -47,26 +47,34 @@ textarea {
 }
 
 .field:focus {
-  border-color: #2252e8;
-  box-shadow: 0 0 0 4px rgba(34, 82, 232, 0.12);
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
 }
 
 .field::placeholder {
-  color: #7b8798;
+  color: #9ca3af;
 }
 
 .admin-field {
   width: 100%;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  border-radius: 0.75rem;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
   padding: 0.95rem 1rem;
-  color: white;
+  color: #111827;
   outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.admin-field:focus {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
 }
 
 .admin-field::placeholder {
-  color: #94a3b8;
+  color: #9ca3af;
 }
 
 .scrollbar-hide {

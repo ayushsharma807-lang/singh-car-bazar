@@ -26,19 +26,19 @@ export function AdminShell({
   searchPlaceholder?: string;
 }) {
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f6fbff_0%,#eef6ff_50%,#f9fbff_100%)] text-slate-900">
+    <div className="min-h-screen bg-white text-gray-900">
       <div className="mx-auto flex min-h-screen max-w-[1680px] gap-4 px-3 py-3 lg:px-4">
-        <aside className="flex w-[220px] shrink-0 flex-col justify-between rounded-[28px] border border-sky-100 bg-white/90 p-4 shadow-[0_18px_40px_rgba(148,163,184,0.14)] backdrop-blur max-lg:hidden">
+        <aside className="flex w-[220px] shrink-0 flex-col justify-between rounded-xl border border-gray-200 bg-white p-4 shadow-sm max-lg:hidden">
           <div className="grid gap-5">
-            <div className="flex items-center gap-3 rounded-[24px] bg-sky-50/80 p-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#2563eb_0%,#1d4ed8_100%)] text-white shadow-[0_16px_30px_rgba(37,99,235,0.28)]">
+            <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-gray-200 bg-white text-black">
                 <CarFront className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#ff8a2e]">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">
                   Singh Car Bazar
                 </p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">Dealer file system</p>
+                <p className="mt-1 text-sm font-semibold text-black">Dealer file system</p>
               </div>
             </div>
 
@@ -50,9 +50,9 @@ export function AdminShell({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="flex items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-sm font-semibold text-slate-700 transition hover:border-sky-100 hover:bg-sky-50 hover:text-sky-700"
+                    className="flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-sm font-semibold text-gray-800 transition hover:border-gray-200 hover:bg-gray-50"
                   >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-black">
                       <Icon className="h-4 w-4" />
                     </span>
                     {item.label}
@@ -65,7 +65,7 @@ export function AdminShell({
           <form action={adminSignOutAction}>
             <button
               type="submit"
-              className="flex w-full items-center justify-center gap-3 rounded-2xl border border-orange-100 bg-orange-50 px-3 py-3 text-sm font-semibold text-[#ff8a2e] transition hover:bg-orange-100"
+              className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm font-semibold text-black transition hover:bg-gray-50"
             >
               <LogOut className="h-4 w-4" />
               Sign Out
@@ -74,32 +74,32 @@ export function AdminShell({
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <header className="rounded-[30px] border border-sky-100 bg-white/90 px-4 py-4 shadow-[0_18px_40px_rgba(148,163,184,0.14)] backdrop-blur">
+          <header className="rounded-xl border border-gray-200 bg-white px-4 py-4 shadow-sm">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#ff8a2e]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-gray-500">
                   Singh Car Bazar
                 </p>
-                <h1 className="mt-1 text-xl font-semibold text-slate-900">
+                <h1 className="mt-1 text-xl font-semibold text-black">
                   Easy car files for seller, car, buyer, and documents
                 </h1>
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm text-gray-600">
                   Add a car fast, search by number plate, and keep every paper in one place.
                 </p>
               </div>
 
               <div className="flex flex-col gap-3 md:flex-row md:items-center">
                 <form action={searchAction} className="relative w-full md:w-[390px]">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <input
                     name="query"
                     placeholder={searchPlaceholder}
-                    className="h-12 w-full rounded-2xl border border-sky-100 bg-sky-50/70 px-10 text-sm text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-sky-300"
+                    className="h-12 w-full rounded-xl border border-gray-300 bg-white px-10 text-sm text-black shadow-sm outline-none placeholder:text-gray-400"
                   />
                 </form>
                 <Link
                   href="/admin/files/new"
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#2252e8] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
                 >
                   <FilePlus2 className="h-4 w-4" />
                   Add Car
@@ -120,7 +120,7 @@ function FloatingAddButton() {
   return (
     <Link
       href="/admin/files/new"
-      className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-[linear-gradient(180deg,#2563eb_0%,#1d4ed8_100%)] px-5 py-4 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(37,99,235,0.32)] transition hover:scale-[1.02] lg:hidden"
+      className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-xl bg-black px-5 py-4 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 lg:hidden"
       title="Add Car"
     >
       <FilePlus2 className="h-5 w-5" />

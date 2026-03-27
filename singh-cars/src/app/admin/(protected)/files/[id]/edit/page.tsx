@@ -20,14 +20,14 @@ export default async function EditAdminFilePage({
   return (
     <AdminShell>
       <div className="grid gap-5">
-        <section className="rounded-[30px] border border-sky-100 bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#ff8a2e]">
+        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gray-500">
             Edit Car
           </p>
-          <h1 className="mt-2 text-2xl font-semibold text-slate-900">
+          <h1 className="mt-2 text-2xl font-semibold text-black">
             {file.fileNumber} · {file.carName}
           </h1>
-          <p className="mt-3 text-sm text-slate-600">
+          <p className="mt-3 text-sm text-gray-600">
             Update the seller, car, buyer, or documents without leaving this file.
           </p>
         </section>
