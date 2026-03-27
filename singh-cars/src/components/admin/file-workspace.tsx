@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { AdminFileRecord, ListingDocument, ListingImage } from "@/types";
 import {
   removeDocumentAction,
@@ -25,15 +25,20 @@ function SectionCard({
   title,
   children,
   actions,
+  status,
 }: {
   title: string;
   children: React.ReactNode;
   actions?: React.ReactNode;
+  status?: React.ReactNode;
 }) {
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 border-b border-gray-200 pb-4 md:flex-row md:items-center md:justify-between">
-        <h2 className="text-lg font-semibold text-black">{title}</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold text-black">{title}</h2>
+          {status}
+        </div>
         {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
       </div>
       <div className="mt-5">{children}</div>
@@ -97,6 +102,89 @@ const buyerDocumentTypes = [
   { label: "Buyer ID", docType: "buyer_id" },
 ];
 
+function StatusChip({
+  label,
+  tone = "neutral",
+}: {
+  label: string;
+  tone?: "neutral" | "success" | "warning";
+}) {
+  const tones = {
+    neutral: "border-gray-200 bg-white text-black",
+    success: "border-gray-200 bg-gray-50 text-black",
+    warning: "border-gray-300 bg-gray-100 text-gray-800",
+  } as const;
+
+  return (
+    <span className={`inline-flex rounded-xl border px-3 py-1 text-xs font-semibold ${tones[tone]}`}>
+      {label}
+    </span>
+  );
+}
+
+function UploadPicker({
+  action,
+  listingId,
+  buttonLabel,
+  inputName,
+  accept,
+  multiple = false,
+  extraFields,
+}: {
+  action: (formData: FormData) => void | Promise<void>;
+  listingId: string;
+  buttonLabel: string;
+  inputName: string;
+  accept?: string;
+  multiple?: boolean;
+  extraFields?: { name: string; value: string }[];
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedLabel, setSelectedLabel] = useState("");
+
+  return (
+    <form action={action}>
+      <input type="hidden" name="listingId" value={listingId} />
+      {extraFields?.map((field) => (
+        <input key={field.name} type="hidden" name={field.name} value={field.value} />
+      ))}
+      <input
+        ref={inputRef}
+        type="file"
+        name={inputName}
+        accept={accept}
+        multiple={multiple}
+        className="hidden"
+        onChange={(event) => {
+          const files = Array.from(event.currentTarget.files ?? []);
+
+          if (!files.length) {
+            return;
+          }
+
+          setSelectedLabel(
+            multiple
+              ? `${files.length} file${files.length > 1 ? "s" : ""} selected`
+              : files[0]?.name ?? "",
+          );
+
+          event.currentTarget.form?.requestSubmit();
+        }}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="admin-btn admin-btn-sm"
+          onClick={() => inputRef.current?.click()}
+        >
+          {buttonLabel}
+        </button>
+        {selectedLabel ? <span className="text-xs text-gray-500">{selectedLabel}</span> : null}
+      </div>
+    </form>
+  );
+}
+
 export function FileWorkspace({ file }: { file: AdminFileRecord }) {
   const [editingSeller, setEditingSeller] = useState(false);
   const [editingCar, setEditingCar] = useState(false);
@@ -109,11 +197,16 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
     () => groupDocuments(file.listing.documents),
     [file.listing.documents],
   );
+  const sellerDocsReady = documents.seller.length > 0;
+  const buyerDocsReady = documents.buyer.length > 0;
+  const carDocsReady = documents.car.length > 0;
+  const carPhotosReady = file.listing.images.length > 0;
 
   return (
     <div className="grid gap-5">
       <SectionCard
         title="Seller Info"
+        status={<StatusChip label={sellerDocsReady ? "Seller Docs Ready" : "Missing Seller Docs"} tone={sellerDocsReady ? "success" : "warning"} />}
         actions={
           !editingSeller ? (
             <button type="button" className="admin-btn admin-btn-sm" onClick={() => setEditingSeller(true)}>
@@ -167,10 +260,14 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
         listingId={file.id}
         documentTypes={sellerDocumentTypes}
         documents={documents.seller}
+        uploadLabel="Upload Seller Docs"
+        readyLabel={sellerDocsReady ? "Seller Docs Ready" : "Missing Seller Docs"}
+        isReady={sellerDocsReady}
       />
 
       <SectionCard
         title="Car Info"
+        status={<StatusChip label={carDocsReady && carPhotosReady ? "Car Ready" : "Car Details Pending"} tone={carDocsReady && carPhotosReady ? "success" : "warning"} />}
         actions={
           !editingCar ? (
             <button type="button" className="admin-btn admin-btn-sm" onClick={() => setEditingCar(true)}>
@@ -278,12 +375,16 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
         listingId={file.id}
         documentTypes={carDocumentTypes}
         documents={documents.car}
+        uploadLabel="Upload Car Docs"
+        readyLabel={carDocsReady ? "Car Docs Ready" : "Car Docs Pending"}
+        isReady={carDocsReady}
       />
 
-      <PhotoSection listingId={file.id} images={file.listing.images} />
+      <PhotoSection listingId={file.id} images={file.listing.images} ready={carPhotosReady} />
 
       <SectionCard
         title="Buyer Info"
+        status={<StatusChip label={buyerDocsReady ? "Buyer Docs Ready" : "Buyer Docs Pending"} tone={buyerDocsReady ? "success" : "warning"} />}
         actions={
           !editingBuyer ? (
             <button type="button" className="admin-btn admin-btn-sm" onClick={() => setEditingBuyer(true)}>
@@ -345,6 +446,9 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
         listingId={file.id}
         documentTypes={buyerDocumentTypes}
         documents={documents.buyer}
+        uploadLabel="Upload Buyer Docs"
+        readyLabel={buyerDocsReady ? "Buyer Docs Ready" : "Buyer Docs Pending"}
+        isReady={buyerDocsReady}
       />
     </div>
   );
@@ -355,14 +459,34 @@ function DocumentSection({
   listingId,
   documentTypes,
   documents,
+  uploadLabel,
+  readyLabel,
+  isReady,
 }: {
   title: string;
   listingId: string;
   documentTypes: { label: string; docType: string }[];
   documents: ListingDocument[];
+  uploadLabel: string;
+  readyLabel: string;
+  isReady: boolean;
 }) {
   return (
-    <SectionCard title={title}>
+    <SectionCard
+      title={title}
+      status={<StatusChip label={readyLabel} tone={isReady ? "success" : "warning"} />}
+      actions={
+        documentTypes.length === 1 ? (
+          <UploadPicker
+            action={replaceDocumentAction}
+            listingId={listingId}
+            buttonLabel={uploadLabel}
+            inputName="file"
+            extraFields={[{ name: "docType", value: documentTypes[0].docType }]}
+          />
+        ) : undefined
+      }
+    >
       <div className="grid gap-4">
         {documentTypes.map((item) => {
           const document = documents.find((entry) => entry.docType === item.docType);
@@ -392,14 +516,17 @@ function DocumentSection({
                 </div>
               </div>
 
-              <form action={replaceDocumentAction} className="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
-                <input type="hidden" name="listingId" value={listingId} />
-                <input type="hidden" name="docType" value={item.docType} />
-                <input className="admin-field" type="file" name="file" required />
-                <button type="submit" className="admin-btn admin-btn-sm">
-                  {document ? "Replace File" : `Upload ${item.label}`}
-                </button>
-              </form>
+              {documentTypes.length > 1 ? (
+                <div className="mt-4">
+                  <UploadPicker
+                    action={replaceDocumentAction}
+                    listingId={listingId}
+                    buttonLabel={document ? "Replace File" : `Upload ${item.label}`}
+                    inputName="file"
+                    extraFields={[{ name: "docType", value: item.docType }]}
+                  />
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -411,24 +538,29 @@ function DocumentSection({
 function PhotoSection({
   listingId,
   images,
+  ready,
 }: {
   listingId: string;
   images: ListingImage[];
+  ready: boolean;
 }) {
   return (
-    <SectionCard title="Car Photos">
-      <form action={uploadListingImagesAction} className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4">
-        <input type="hidden" name="listingId" value={listingId} />
-        <label className="text-sm font-semibold text-black">Upload car photos</label>
-        <input className="admin-field" type="file" name="images" multiple accept="image/*" required />
-        <div>
-          <button type="submit" className="admin-btn admin-btn-sm">
-            Upload Car Photos
-          </button>
-        </div>
-      </form>
+    <SectionCard
+      title="Car Photos"
+      status={<StatusChip label={ready ? "Car Ready" : "Photos Pending"} tone={ready ? "success" : "warning"} />}
+      actions={
+        <UploadPicker
+          action={uploadListingImagesAction}
+          listingId={listingId}
+          buttonLabel="Upload Car Photos"
+          inputName="images"
+          accept="image/*"
+          multiple
+        />
+      }
+    >
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {images.length ? (
           images.map((image) => (
             <article key={image.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white">

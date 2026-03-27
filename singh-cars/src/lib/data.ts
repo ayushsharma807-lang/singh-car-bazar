@@ -304,17 +304,20 @@ export async function getAdminListings(filters: {
 }
 
 function inferDocumentStatus(listing: Listing) {
-  const sellerReady = listing.documents.some((document) =>
-    ["rc", "insurance", "seller_id"].includes(document.docType),
+  const sellerReady = listing.documents.some(
+    (document) => document.docType === "seller_id",
   );
-  const carReady = Boolean(listing.coverImageUrl || listing.images.length);
-  const buyerReady = listing.documents.some((document) =>
-    ["buyer_id", "loan_noc", "other"].includes(document.docType),
+  const carDocsReady = listing.documents.some((document) =>
+    ["rc", "insurance", "loan_noc", "other"].includes(document.docType),
+  );
+  const carPhotosReady = Boolean(listing.coverImageUrl || listing.images.length);
+  const buyerReady = listing.documents.some(
+    (document) => document.docType === "buyer_id",
   );
 
   return {
     sellerReady,
-    carReady,
+    carReady: carDocsReady && carPhotosReady,
     buyerReady,
   };
 }
