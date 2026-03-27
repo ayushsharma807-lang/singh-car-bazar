@@ -4,7 +4,7 @@ import { PlaceholderMedia } from "@/components/public/placeholder-media";
 import { StatusBadge } from "@/components/public/status-badge";
 import { SiteShell } from "@/components/public/site-shell";
 import { siteConfig } from "@/config/site";
-import { getListingBySlug } from "@/lib/data";
+import { getListingById } from "@/lib/data";
 import { formatNumber, formatPrice } from "@/lib/utils";
 
 type CarDetailPageProps = {
@@ -13,13 +13,22 @@ type CarDetailPageProps = {
 
 export default async function CarDetailPage({ params }: CarDetailPageProps) {
   const { slug } = await params;
-  const listing = await getListingBySlug(slug);
+  const listing = await getListingById(slug);
 
   if (!listing) {
     notFound();
   }
 
-  const gallery = listing.images.length ? listing.images : [{ id: "placeholder", imageUrl: "", isFeatured: true, sortOrder: 0, listingId: listing.id }];
+  const gallery = listing.images.length
+    ? listing.images
+    : [
+        {
+          id: "placeholder",
+          imageUrl: "",
+          sortOrder: 0,
+          listingId: listing.id,
+        },
+      ];
 
   return (
     <SiteShell currentPath="/inventory">
@@ -34,14 +43,22 @@ export default async function CarDetailPage({ params }: CarDetailPageProps) {
                     key={image.id}
                     src={image.imageUrl}
                     alt={`${listing.make} ${listing.model} ${index + 1}`}
-                    className={index === 0 ? "h-[360px] w-full rounded-[28px] object-cover md:col-span-2" : "h-52 w-full rounded-[28px] object-cover"}
+                    className={
+                      index === 0
+                        ? "h-[360px] w-full rounded-[28px] object-cover md:col-span-2"
+                        : "h-52 w-full rounded-[28px] object-cover"
+                    }
                   />
                 ) : (
                   <PlaceholderMedia
                     key={image.id}
                     label={`${listing.make} ${listing.model}`}
-                    subtitle={index === 0 ? "Cover photo placeholder" : `Gallery ${index + 1}`}
-                    className={index === 0 ? "md:col-span-2 min-h-[360px]" : "min-h-[208px]"}
+                    subtitle={
+                      index === 0 ? "Cover photo placeholder" : `Gallery ${index + 1}`
+                    }
+                    className={
+                      index === 0 ? "md:col-span-2 min-h-[360px]" : "min-h-[208px]"
+                    }
                   />
                 ),
               )}
@@ -60,17 +77,19 @@ export default async function CarDetailPage({ params }: CarDetailPageProps) {
               <StatusBadge status={listing.status} />
             </div>
             <p className="mt-3 text-lg text-slate-600">{listing.variant}</p>
-            <p className="mt-5 text-4xl font-bold text-[#2252e8]">{formatPrice(listing.price)}</p>
+            <p className="mt-5 text-4xl font-bold text-[#2252e8]">
+              {formatPrice(listing.price)}
+            </p>
 
             <div className="mt-8 grid gap-3 rounded-[24px] bg-slate-50 p-5 text-sm text-slate-600 sm:grid-cols-2">
               <p>Year: {listing.year}</p>
               <p>KM Driven: {formatNumber(listing.kmDriven)}</p>
               <p>Fuel: {listing.fuel}</p>
               <p>Transmission: {listing.transmission}</p>
-              <p>Owner Number: {listing.ownerNumber ?? "N/A"}</p>
-              <p>Registration Year: {listing.registrationYear ?? "N/A"}</p>
+              <p>Owner Count: {listing.ownerCount ?? "N/A"}</p>
               <p>Seller Type: {listing.sellerType}</p>
               <p>Location: {listing.location}</p>
+              <p>Stock Number: {listing.stockNumber}</p>
             </div>
 
             <p className="mt-6 leading-8 text-slate-600">{listing.description}</p>
@@ -99,13 +118,13 @@ export default async function CarDetailPage({ params }: CarDetailPageProps) {
               Seller Details
             </p>
             <div className="mt-4 grid gap-3 text-slate-600">
-              <p>Name: {listing.seller.name}</p>
-              <p>Phone: {listing.seller.phone}</p>
-              <p>Type: {listing.seller.sellerType}</p>
-              {listing.seller.address ? <p>Address: {listing.seller.address}</p> : null}
+              <p>Name: {listing.seller?.name ?? "N/A"}</p>
+              <p>Phone: {listing.seller?.phone ?? "N/A"}</p>
+              <p>Type: {listing.seller?.sellerType ?? listing.sellerType}</p>
+              {listing.seller?.address ? <p>Address: {listing.seller.address}</p> : null}
             </div>
           </div>
-          <InquiryForm listingId={listing.id} carTitle={`${listing.make} ${listing.model} ${listing.year}`} />
+          <InquiryForm listingId={listing.id} />
         </div>
       </section>
     </SiteShell>

@@ -3,11 +3,12 @@ export type SellerType = "dealer" | "private";
 
 export type Seller = {
   id: string;
-  sellerType: SellerType;
+  listingId: string;
   name: string;
   phone: string;
   address?: string | null;
   notes?: string | null;
+  sellerType: SellerType;
 };
 
 export type Buyer = {
@@ -16,53 +17,51 @@ export type Buyer = {
   name?: string | null;
   phone?: string | null;
   notes?: string | null;
-  saleDate?: string | null;
   soldPrice?: number | null;
+  saleDate?: string | null;
 };
 
 export type ListingImage = {
   id: string;
   listingId: string;
   imageUrl: string;
-  isFeatured: boolean;
   sortOrder: number;
 };
 
 export type ListingDocument = {
   id: string;
   listingId: string;
-  documentType: string;
-  fileName: string;
+  docType: string;
   fileUrl: string;
+  notes?: string | null;
 };
 
 export type Listing = {
   id: string;
-  slug: string;
+  createdAt?: string;
+  updatedAt?: string;
   stockNumber: string;
   numberPlate: string;
   make: string;
   model: string;
   variant?: string | null;
   year: number;
-  registrationYear?: number | null;
   fuel: string;
   transmission: string;
   kmDriven: number;
   color?: string | null;
-  ownerNumber?: number | null;
+  ownerCount?: number | null;
   price: number;
   location: string;
   description?: string | null;
-  featured: boolean;
-  status: ListingStatus;
-  isPublished: boolean;
   sellerType: SellerType;
-  seller: Seller;
-  buyer?: Buyer | null;
+  status: ListingStatus;
+  featured: boolean;
+  coverImageUrl?: string | null;
   images: ListingImage[];
+  seller?: Seller | null;
+  buyer?: Buyer | null;
   documents: ListingDocument[];
-  createdAt?: string;
 };
 
 export type Inquiry = {
@@ -72,7 +71,6 @@ export type Inquiry = {
   phone: string;
   email?: string | null;
   message?: string | null;
-  carTitle?: string | null;
   createdAt: string;
 };
 

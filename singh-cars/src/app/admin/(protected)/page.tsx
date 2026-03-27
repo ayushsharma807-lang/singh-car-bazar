@@ -36,7 +36,9 @@ export default async function AdminDashboardPage() {
               <div key={inquiry.id} className="rounded-[20px] border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-300">
                 <p className="font-semibold text-white">{inquiry.name}</p>
                 <p className="mt-1">{inquiry.phone}</p>
-                <p className="mt-1">{inquiry.carTitle ?? "General inquiry"}</p>
+                <p className="mt-1">
+                  {inquiry.listingId ? `Listing ${inquiry.listingId}` : "General inquiry"}
+                </p>
               </div>
             ))}
           </div>

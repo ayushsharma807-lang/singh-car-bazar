@@ -14,7 +14,9 @@ export default async function AdminInquiriesPage() {
                 <h2 className="font-display text-3xl uppercase tracking-[0.08em] text-white">
                   {inquiry.name}
                 </h2>
-                <p className="mt-1 text-slate-400">{inquiry.carTitle ?? "General inquiry"}</p>
+                <p className="mt-1 text-slate-400">
+                  {inquiry.listingId ? `Listing ${inquiry.listingId}` : "General inquiry"}
+                </p>
               </div>
               <p className="text-sm uppercase tracking-[0.2em] text-[#ff8a2e]">
                 {new Date(inquiry.createdAt).toLocaleString("en-IN")}

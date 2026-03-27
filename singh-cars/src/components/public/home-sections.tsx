@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { siteConfig } from "@/config/site";
+import { InquiryForm } from "@/components/public/inquiry-form";
 import { InventoryCard } from "@/components/public/inventory-card";
 import { PlaceholderMedia } from "@/components/public/placeholder-media";
 import { formatNumber } from "@/lib/utils";
@@ -27,7 +28,14 @@ function SectionHeading({
   );
 }
 
-export function HomeSections({ featuredListings }: { featuredListings: Listing[] }) {
+export function HomeSections({
+  featuredListings,
+  galleryListings,
+}: {
+  featuredListings: Listing[];
+  galleryListings: Listing[];
+}) {
+
   return (
     <>
       <section className="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#eef4ff_100%)]">
@@ -47,33 +55,39 @@ export function HomeSections({ featuredListings }: { featuredListings: Listing[]
                 href="/inventory"
                 className="rounded-full bg-[#2252e8] px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-[#173bb0]"
               >
-                View Inventory
+                Buy Now
               </Link>
               <Link
                 href="/contact"
                 className="rounded-full border border-[#ff8a2e] px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-[#ff8a2e] transition hover:bg-[#ff8a2e] hover:text-white"
               >
-                Contact Us
+                Sell Now
               </Link>
             </div>
           </div>
           <div className="grid gap-5">
             <PlaceholderMedia label="Featured Inventory" subtitle="Live database feed" className="min-h-[320px]" />
             <div className="grid gap-5 md:grid-cols-2">
-              <div className="rounded-[28px] bg-[#2252e8] p-6 text-white shadow-[0_25px_60px_rgba(34,82,232,0.22)]">
+              <Link
+                href="/inventory"
+                className="rounded-[28px] bg-[#2252e8] p-6 text-white shadow-[0_25px_60px_rgba(34,82,232,0.22)] transition hover:scale-[1.02] hover:shadow-[0_30px_70px_rgba(34,82,232,0.28)]"
+              >
                 <p className="text-sm uppercase tracking-[0.24em] text-white/80">To Buy Car</p>
                 <h3 className="mt-3 font-display text-3xl uppercase tracking-[0.08em]">
                   At Reasonable Price
                 </h3>
                 <p className="mt-3 text-white/85">Click to view available cars from the live inventory.</p>
-              </div>
-              <div className="rounded-[28px] bg-[#ff8a2e] p-6 text-white shadow-[0_25px_60px_rgba(255,138,46,0.22)]">
+              </Link>
+              <Link
+                href="/contact"
+                className="rounded-[28px] bg-[#ff8a2e] p-6 text-white shadow-[0_25px_60px_rgba(255,138,46,0.22)] transition hover:scale-[1.02] hover:shadow-[0_30px_70px_rgba(255,138,46,0.28)]"
+              >
                 <p className="text-sm uppercase tracking-[0.24em] text-white/80">Want To Sell Your Car?</p>
                 <h3 className="mt-3 font-display text-3xl uppercase tracking-[0.08em]">
                   At Reasonable Price
                 </h3>
                 <p className="mt-3 text-white/85">Fill car details and we will help you close the right deal.</p>
-              </div>
+              </Link>
             </div>
           </div>
         </div>
@@ -164,16 +178,34 @@ export function HomeSections({ featuredListings }: { featuredListings: Listing[]
           <SectionHeading
             eyebrow="Gallery"
             title="Gallery / Customer Delivery"
-            description="A delivery and gallery section styled close to the current site, with placeholders until the final media is ready."
+            description="A delivery and gallery section styled close to the current site, now pulling from live listing photos where available."
           />
           <div className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {siteConfig.gallery.map((item, index) => (
-              <PlaceholderMedia
-                key={item}
-                label={item}
-                subtitle={index % 2 === 0 ? "Customer moments" : "Vehicle showcase"}
-              />
-            ))}
+            {galleryListings.length
+              ? galleryListings.map((listing) =>
+                  listing.coverImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={listing.id}
+                      src={listing.coverImageUrl}
+                      alt={`${listing.make} ${listing.model}`}
+                      className="h-[260px] w-full rounded-[28px] object-cover shadow-sm"
+                    />
+                  ) : (
+                    <PlaceholderMedia
+                      key={listing.id}
+                      label={`${listing.make} ${listing.model}`}
+                      subtitle="Live listing placeholder"
+                    />
+                  ),
+                )
+              : siteConfig.gallery.map((item, index) => (
+                  <PlaceholderMedia
+                    key={item}
+                    label={item}
+                    subtitle={index % 2 === 0 ? "Customer moments" : "Vehicle showcase"}
+                  />
+                ))}
           </div>
         </div>
       </section>
@@ -260,20 +292,7 @@ export function HomeSections({ featuredListings }: { featuredListings: Listing[]
               <p>Featured Cars: {formatNumber(featuredListings.length)}</p>
             </div>
           </div>
-          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#2252e8]">
-              Contact / Inquiry
-            </p>
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <input className="field" placeholder="Your Name" />
-              <input className="field" placeholder="Phone Number" />
-              <input className="field md:col-span-2" placeholder="Email Address" />
-              <textarea className="field min-h-[140px] md:col-span-2" placeholder="Tell us what you want to buy or sell" />
-            </div>
-            <button className="mt-6 rounded-full bg-[#ff8a2e] px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-[#e17216]">
-              Send Inquiry
-            </button>
-          </div>
+          <InquiryForm title="Contact / Inquiry" submitLabel="Request a Quote" />
         </div>
       </section>
     </>

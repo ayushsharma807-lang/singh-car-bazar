@@ -15,8 +15,7 @@ const documentFields = [
 ];
 
 export function ListingForm({ listing }: ListingFormProps) {
-  const featuredImageUrl =
-    listing?.images.find((image) => image.isFeatured)?.imageUrl ?? "";
+  const coverImageUrl = listing?.coverImageUrl ?? "";
 
   return (
     <form
@@ -34,10 +33,10 @@ export function ListingForm({ listing }: ListingFormProps) {
               <option value="dealer">Dealer</option>
               <option value="private">Private</option>
             </select>
-            <input className="admin-field" name="sellerName" defaultValue={listing?.seller.name ?? ""} placeholder="Seller name" />
-            <input className="admin-field" name="sellerPhone" defaultValue={listing?.seller.phone ?? ""} placeholder="Seller phone" />
-            <input className="admin-field" name="sellerAddress" defaultValue={listing?.seller.address ?? ""} placeholder="Optional address" />
-            <textarea className="admin-field min-h-[120px]" name="sellerNotes" defaultValue={listing?.seller.notes ?? ""} placeholder="Optional notes" />
+            <input className="admin-field" name="sellerName" defaultValue={listing?.seller?.name ?? ""} placeholder="Seller name" />
+            <input className="admin-field" name="sellerPhone" defaultValue={listing?.seller?.phone ?? ""} placeholder="Seller phone" />
+            <input className="admin-field" name="sellerAddress" defaultValue={listing?.seller?.address ?? ""} placeholder="Optional address" />
+            <textarea className="admin-field min-h-[120px]" name="sellerNotes" defaultValue={listing?.seller?.notes ?? ""} placeholder="Optional notes" />
           </div>
         </section>
 
@@ -56,8 +55,7 @@ export function ListingForm({ listing }: ListingFormProps) {
             <input className="admin-field" name="transmission" defaultValue={listing?.transmission ?? ""} placeholder="Transmission" required />
             <input className="admin-field" type="number" name="kmDriven" defaultValue={listing?.kmDriven ?? ""} placeholder="KM driven" required />
             <input className="admin-field" name="color" defaultValue={listing?.color ?? ""} placeholder="Color" />
-            <input className="admin-field" type="number" name="ownerNumber" defaultValue={listing?.ownerNumber ?? ""} placeholder="Owner number" />
-            <input className="admin-field" type="number" name="registrationYear" defaultValue={listing?.registrationYear ?? ""} placeholder="Registration year" />
+            <input className="admin-field" type="number" name="ownerCount" defaultValue={listing?.ownerCount ?? ""} placeholder="Owner count" />
             <input className="admin-field" type="number" name="price" defaultValue={listing?.price ?? ""} placeholder="Price" required />
             <input className="admin-field" name="location" defaultValue={listing?.location ?? ""} placeholder="Location" required />
             <select className="admin-field" name="status" defaultValue={listing?.status ?? "available"}>
@@ -69,14 +67,10 @@ export function ListingForm({ listing }: ListingFormProps) {
               <input type="checkbox" name="featured" defaultChecked={listing?.featured ?? false} />
               Mark as featured
             </label>
-            <label className="flex items-center gap-3 rounded-[18px] border border-white/10 px-4 py-3 text-sm text-slate-300 md:col-span-2">
-              <input type="checkbox" name="isPublished" defaultChecked={listing?.isPublished ?? true} />
-              Publish on website
-            </label>
             <textarea className="admin-field min-h-[140px] md:col-span-2" name="description" defaultValue={listing?.description ?? ""} placeholder="Description" />
-            <input className="admin-field md:col-span-2" name="featuredImageUrl" defaultValue={featuredImageUrl} placeholder="Featured image URL (optional for existing image)" />
+            <input className="admin-field md:col-span-2" name="coverImageUrl" defaultValue={coverImageUrl} placeholder="Cover image URL (optional for existing image)" />
             <div className="md:col-span-2 rounded-[18px] border border-dashed border-white/15 p-4">
-              <p className="text-sm text-slate-400">Upload multiple car photos. If no featured image URL is selected, the first uploaded photo becomes the cover.</p>
+              <p className="text-sm text-slate-400">Upload multiple car photos. If no cover image URL is provided, the first uploaded photo becomes the cover.</p>
               <input className="mt-3 block text-sm text-slate-300" type="file" name="images" multiple accept="image/*" />
             </div>
           </div>
@@ -104,6 +98,7 @@ export function ListingForm({ listing }: ListingFormProps) {
               <label key={field.name} className="rounded-[18px] border border-white/10 p-4 text-sm text-slate-300">
                 <span>{field.label}</span>
                 <input className="mt-3 block w-full text-sm text-slate-300" type="file" name={field.name} />
+                <input className="admin-field mt-3" name={`${field.name}_notes`} placeholder={`${field.label} notes`} />
               </label>
             ))}
           </div>
