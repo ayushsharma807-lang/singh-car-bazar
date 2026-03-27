@@ -355,6 +355,7 @@ export async function getAdminFiles(filters: {
   query?: string;
   status?: string;
   sellerType?: string;
+  missing?: string;
 } = {}) {
   const listings = await getAdminListings({
     search: filters.query,
@@ -383,6 +384,17 @@ export async function getAdminFiles(filters: {
         .toLowerCase();
 
       return haystack.includes(query);
+    })
+    .filter((file) => {
+      if (filters.missing === "buyer") {
+        return !file.documentStatus.buyerReady;
+      }
+
+      if (filters.missing === "seller") {
+        return !file.documentStatus.sellerReady;
+      }
+
+      return true;
     });
 }
 

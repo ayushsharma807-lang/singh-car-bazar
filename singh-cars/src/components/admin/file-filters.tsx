@@ -7,6 +7,7 @@ export function FileFilters({
 }) {
   return (
     <form className="grid gap-4 rounded-[28px] border border-sky-100 bg-white p-5 shadow-sm md:grid-cols-4">
+      {searchParams.missing ? <input type="hidden" name="missing" value={searchParams.missing} /> : null}
       <input
         className="field h-12"
         name="query"

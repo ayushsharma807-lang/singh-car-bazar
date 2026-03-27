@@ -4,6 +4,7 @@ import {
   CarFront,
   FilePlus2,
   Files,
+  CircleHelp,
   LayoutGrid,
   LogOut,
   Search,
@@ -14,6 +15,7 @@ const navItems = [
   { href: "/admin", label: "Home", icon: LayoutGrid },
   { href: "/admin/files", label: "Car Files", icon: Files },
   { href: "/admin/files/new", label: "Add Car", icon: FilePlus2 },
+  { href: "/admin/help", label: "Help", icon: CircleHelp },
 ];
 
 export function AdminShell({
