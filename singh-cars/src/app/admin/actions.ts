@@ -45,6 +45,67 @@ async function uploadFile(bucket: string, path: string, file: File) {
   return data.publicUrl;
 }
 
+function getStoragePathFromPublicUrl(bucket: string, publicUrl: string) {
+  try {
+    const url = new URL(publicUrl);
+    const marker = `/storage/v1/object/public/${bucket}/`;
+    const index = url.pathname.indexOf(marker);
+
+    if (index === -1) {
+      return null;
+    }
+
+    return decodeURIComponent(url.pathname.slice(index + marker.length));
+  } catch {
+    return null;
+  }
+}
+
+async function deletePublicFile(bucket: string, publicUrl: string | null | undefined) {
+  const supabase = createSupabaseAdminClient();
+
+  if (!supabase || !publicUrl) {
+    return;
+  }
+
+  const path = getStoragePathFromPublicUrl(bucket, publicUrl);
+
+  if (!path) {
+    return;
+  }
+
+  await supabase.storage.from(bucket).remove([path]);
+}
+
+function buildBuyerNotes(address: string, notes: string) {
+  const cleanAddress = address.trim();
+  const cleanNotes = notes.trim();
+
+  if (cleanAddress && cleanNotes) {
+    return `Address: ${cleanAddress}\n\n${cleanNotes}`;
+  }
+
+  if (cleanAddress) {
+    return `Address: ${cleanAddress}`;
+  }
+
+  return cleanNotes || null;
+}
+
+async function revalidateAdminFilePaths(listingId: string) {
+  revalidatePath("/");
+  revalidatePath("/inventory");
+  revalidatePath("/admin");
+  revalidatePath("/admin/files");
+  revalidatePath(`/admin/files/${listingId}`);
+  revalidatePath(`/admin/files/${listingId}/edit`);
+}
+
+async function redirectToAdminFile(listingId: string) {
+  await revalidateAdminFilePaths(listingId);
+  redirect(`/admin/files/${listingId}`);
+}
+
 export async function submitInquiryAction(formData: FormData) {
   const supabase = await createServerSupabaseClient();
 
@@ -193,9 +254,292 @@ export async function saveListingAction(formData: FormData) {
     });
   }
 
-  revalidatePath("/");
-  revalidatePath("/inventory");
-  revalidatePath("/admin");
-  revalidatePath("/admin/files");
+  await revalidateAdminFilePaths(listingId);
   redirect("/admin/files");
+}
+
+export async function updateSellerInfoAction(formData: FormData) {
+  await requireAdminSession();
+
+  const supabase = createSupabaseAdminClient();
+  const listingId = String(formData.get("listingId") || "");
+
+  if (!supabase || !listingId) {
+    throw new Error("Unable to update seller info.");
+  }
+
+  await supabase.from("sellers").upsert({
+    listing_id: listingId,
+    name: String(formData.get("sellerName") || ""),
+    phone: String(formData.get("sellerPhone") || ""),
+    address: String(formData.get("sellerAddress") || "") || null,
+    notes: String(formData.get("sellerNotes") || "") || null,
+    seller_type: "dealer",
+  });
+
+  await redirectToAdminFile(listingId);
+}
+
+export async function updateCarInfoAction(formData: FormData) {
+  await requireAdminSession();
+
+  const supabase = createSupabaseAdminClient();
+  const listingId = String(formData.get("listingId") || "");
+
+  if (!listingId) {
+    redirect("/admin/files");
+  }
+
+  if (!supabase) {
+    throw new Error("Unable to update car info.");
+  }
+
+  await supabase.from("listings").update({
+    stock_number: String(formData.get("stockNumber") || ""),
+    make: String(formData.get("make") || ""),
+    model: String(formData.get("model") || ""),
+    variant: String(formData.get("variant") || "") || null,
+    year: Number(formData.get("year") || 0),
+    number_plate: String(formData.get("numberPlate") || ""),
+    km_driven: Number(formData.get("kmDriven") || 0),
+    fuel: String(formData.get("fuel") || ""),
+    transmission: String(formData.get("transmission") || ""),
+    price: Number(formData.get("price") || 0),
+    color: String(formData.get("color") || "") || null,
+    location: String(formData.get("location") || ""),
+    description: String(formData.get("description") || "") || null,
+    status: String(formData.get("status") || "available"),
+  }).eq("id", listingId);
+
+  await redirectToAdminFile(listingId);
+}
+
+export async function updateBuyerInfoAction(formData: FormData) {
+  await requireAdminSession();
+
+  const supabase = createSupabaseAdminClient();
+  const listingId = String(formData.get("listingId") || "");
+
+  if (!listingId) {
+    redirect("/admin/files");
+  }
+
+  if (!supabase) {
+    throw new Error("Unable to update buyer info.");
+  }
+
+  const buyerName = String(formData.get("buyerName") || "");
+  const buyerPhone = String(formData.get("buyerPhone") || "");
+  const buyerAddress = String(formData.get("buyerAddress") || "");
+  const buyerNotes = String(formData.get("buyerNotes") || "");
+  const combinedNotes = buildBuyerNotes(buyerAddress, buyerNotes);
+
+  if (!buyerName && !buyerPhone && !buyerAddress && !buyerNotes && !formData.get("soldPrice") && !formData.get("saleDate")) {
+    await supabase.from("buyers").delete().eq("listing_id", listingId);
+  } else {
+    await supabase.from("buyers").upsert({
+      listing_id: listingId,
+      name: buyerName || null,
+      phone: buyerPhone || null,
+      notes: combinedNotes,
+      sold_price: Number(formData.get("soldPrice") || 0) || null,
+      sale_date: String(formData.get("saleDate") || "") || null,
+    });
+  }
+
+  await redirectToAdminFile(listingId);
+}
+
+export async function uploadListingImagesAction(formData: FormData) {
+  await requireAdminSession();
+
+  const supabase = createSupabaseAdminClient();
+  const listingId = String(formData.get("listingId") || "");
+  const files = formData
+    .getAll("images")
+    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+
+  if (!listingId) {
+    redirect("/admin/files");
+  }
+
+  if (!supabase) {
+    throw new Error("Unable to upload car photos.");
+  }
+
+  if (!files.length) {
+    await redirectToAdminFile(listingId);
+  }
+
+  const { data: existingImages } = await supabase
+    .from("listing_images")
+    .select("id,sort_order,image_url")
+    .eq("listing_id", listingId)
+    .order("sort_order", { ascending: true });
+
+  let nextSortOrder = existingImages?.length ?? 0;
+
+  const { data: listing } = await supabase
+    .from("listings")
+    .select("cover_image_url")
+    .eq("id", listingId)
+    .maybeSingle();
+
+  let coverImageUrl = listing?.cover_image_url ?? null;
+
+  for (const file of files) {
+    const extension = file.name.split(".").pop() || "jpg";
+    const path = `${listingId}/${Date.now()}-${randomUUID()}.${extension}`;
+    const publicUrl = await uploadFile("listing-photos", path, file);
+
+    if (!publicUrl) {
+      continue;
+    }
+
+    await supabase.from("listing_images").insert({
+      listing_id: listingId,
+      image_url: publicUrl,
+      sort_order: nextSortOrder,
+    });
+
+    if (!coverImageUrl) {
+      coverImageUrl = publicUrl;
+    }
+
+    nextSortOrder += 1;
+  }
+
+  await supabase.from("listings").update({
+    cover_image_url: coverImageUrl,
+  }).eq("id", listingId);
+
+  await redirectToAdminFile(listingId);
+}
+
+export async function removeListingImageAction(formData: FormData) {
+  await requireAdminSession();
+
+  const supabase = createSupabaseAdminClient();
+  const listingId = String(formData.get("listingId") || "");
+  const imageId = String(formData.get("imageId") || "");
+
+  if (!listingId) {
+    redirect("/admin/files");
+  }
+
+  if (!imageId) {
+    await redirectToAdminFile(listingId);
+  }
+
+  if (!supabase) {
+    throw new Error("Unable to remove photo.");
+  }
+
+  const { data: image } = await supabase
+    .from("listing_images")
+    .select("image_url")
+    .eq("id", imageId)
+    .maybeSingle();
+
+  if (image?.image_url) {
+    await deletePublicFile("listing-photos", image.image_url);
+  }
+
+  await supabase.from("listing_images").delete().eq("id", imageId);
+
+  const { data: remainingImages } = await supabase
+    .from("listing_images")
+    .select("image_url,sort_order")
+    .eq("listing_id", listingId)
+    .order("sort_order", { ascending: true });
+
+  await supabase.from("listings").update({
+    cover_image_url: remainingImages?.[0]?.image_url ?? null,
+  }).eq("id", listingId);
+
+  await redirectToAdminFile(listingId);
+}
+
+export async function replaceDocumentAction(formData: FormData) {
+  await requireAdminSession();
+
+  const supabase = createSupabaseAdminClient();
+  const listingId = String(formData.get("listingId") || "");
+  const docType = String(formData.get("docType") || "");
+  const file = formData.get("file");
+
+  if (!listingId) {
+    redirect("/admin/files");
+  }
+
+  if (!docType || !(file instanceof File) || !file.size) {
+    await redirectToAdminFile(listingId);
+  }
+
+  if (!supabase) {
+    throw new Error("Unable to upload document.");
+  }
+
+  const upload = file as File;
+
+  const { data: existingDocs } = await supabase
+    .from("documents")
+    .select("id,file_url")
+    .eq("listing_id", listingId)
+    .eq("doc_type", docType);
+
+  for (const document of existingDocs ?? []) {
+    await deletePublicFile("documents", document.file_url);
+  }
+
+  await supabase.from("documents").delete().eq("listing_id", listingId).eq("doc_type", docType);
+
+  const extension = upload.name.split(".").pop() || "pdf";
+  const path = `${listingId}/${docType}-${randomUUID()}.${extension}`;
+  const publicUrl = await uploadFile("documents", path, upload);
+
+  if (publicUrl) {
+    await supabase.from("documents").insert({
+      listing_id: listingId,
+      doc_type: docType,
+      file_url: publicUrl,
+      notes: null,
+    });
+  }
+
+  await redirectToAdminFile(listingId);
+}
+
+export async function removeDocumentAction(formData: FormData) {
+  await requireAdminSession();
+
+  const supabase = createSupabaseAdminClient();
+  const listingId = String(formData.get("listingId") || "");
+  const docType = String(formData.get("docType") || "");
+
+  if (!listingId) {
+    redirect("/admin/files");
+  }
+
+  if (!docType) {
+    await redirectToAdminFile(listingId);
+  }
+
+  if (!supabase) {
+    throw new Error("Unable to remove document.");
+  }
+
+  const { data: existingDocs } = await supabase
+    .from("documents")
+    .select("id,file_url")
+    .eq("listing_id", listingId)
+    .eq("doc_type", docType);
+
+  for (const document of existingDocs ?? []) {
+    await deletePublicFile("documents", document.file_url);
+  }
+
+  await supabase.from("documents").delete().eq("listing_id", listingId).eq("doc_type", docType);
+
+  await redirectToAdminFile(listingId);
 }

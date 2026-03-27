@@ -101,7 +101,7 @@ export function AdminShell({
                 </form>
                 <Link
                   href="/admin/files/new"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+                  className="admin-btn"
                 >
                   <FilePlus2 className="h-4 w-4" />
                   Add Car
@@ -122,7 +122,7 @@ function FloatingAddButton() {
   return (
     <Link
       href="/admin/files/new"
-      className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-xl bg-black px-5 py-4 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 lg:hidden"
+      className="admin-btn fixed bottom-5 right-5 z-40 shadow-sm lg:hidden"
       title="Add Car"
     >
       <FilePlus2 className="h-5 w-5" />

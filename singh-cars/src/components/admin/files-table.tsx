@@ -30,10 +30,10 @@ export function FilesTable({ files }: { files: AdminFileRecord[] }) {
             </div>
 
             <div className="mt-4 flex gap-3">
-              <Link href={`/admin/files/${file.id}`} className="flex-1 rounded-xl bg-black px-5 py-3 text-center text-sm font-semibold text-white">
+              <Link href={`/admin/files/${file.id}`} className="admin-btn flex-1 text-center">
                 Open File
               </Link>
-              <Link href={`/admin/files/${file.id}/edit`} className="flex-1 rounded-xl border border-gray-300 bg-white px-5 py-3 text-center text-sm font-semibold text-black">
+              <Link href={`/admin/files/${file.id}/edit`} className="admin-btn flex-1 text-center">
                 Edit Car
               </Link>
             </div>

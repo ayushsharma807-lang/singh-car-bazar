@@ -39,9 +39,9 @@ export default async function AdminFileDetailPage({
               <StatusPill status={file.status} />
               <Link
                 href={`/admin/files/${file.id}/edit`}
-                className="rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white"
+                className="admin-btn"
               >
-                Edit File
+                Full Edit Page
               </Link>
             </div>
           </div>

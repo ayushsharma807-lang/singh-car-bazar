@@ -28,13 +28,13 @@ export function FileFilters({
       <div className="flex gap-3">
         <button
           type="submit"
-          className="flex-1 rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white"
+          className="admin-btn flex-1"
         >
           Search
         </button>
         <Link
           href="/admin/files"
-          className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-black"
+          className="admin-btn"
         >
           Reset
         </Link>

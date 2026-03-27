@@ -77,6 +77,47 @@ textarea {
   color: #9ca3af;
 }
 
+.admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  padding: 0.75rem 1rem;
+  color: #111827;
+  font-weight: 600;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.admin-btn:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.admin-btn:disabled {
+  opacity: 0.6;
+}
+
+.admin-btn-sm {
+  padding: 0.55rem 0.9rem;
+  font-size: 0.875rem;
+}
+
+.admin-btn-danger {
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+.admin-btn-danger:hover {
+  background: #f3f4f6;
+}
+
 .scrollbar-hide {
   scrollbar-width: none;
 }

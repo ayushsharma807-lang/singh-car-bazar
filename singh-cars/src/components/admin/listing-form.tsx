@@ -85,7 +85,7 @@ function NextStepButton({
     <button
       type="button"
       onClick={() => setStep(nextStep)}
-      className="rounded-xl bg-black px-6 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+      className="admin-btn"
     >
       Next
     </button>
@@ -283,7 +283,7 @@ export function ListingForm({ listing }: ListingFormProps) {
             <button
               type="button"
               onClick={() => setStep("seller")}
-              className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-gray-50"
+              className="admin-btn"
             >
               Back
             </button>
@@ -349,20 +349,20 @@ export function ListingForm({ listing }: ListingFormProps) {
             <button
               type="button"
               onClick={() => setStep("car")}
-              className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-gray-50"
+              className="admin-btn"
             >
               Back
             </button>
             <div className="flex flex-wrap gap-3">
               <button
                 type="submit"
-                className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-gray-50"
+                className="admin-btn"
               >
                 {isEditing ? "Save Changes" : "Save Car"}
               </button>
               <button
                 type="submit"
-                className="rounded-xl bg-black px-6 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+                className="admin-btn"
               >
                 {isEditing ? "Save and Close" : "Add Car"}
               </button>
