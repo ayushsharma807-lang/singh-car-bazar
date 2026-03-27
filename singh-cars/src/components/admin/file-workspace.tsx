@@ -1,15 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { CarFront, CircleUserRound, UserSquare2 } from "lucide-react";
+import { CarFront, CircleUserRound, FileText, UserSquare2 } from "lucide-react";
 import type { AdminFileRecord } from "@/types";
 
-type Stage = "seller" | "car" | "buyer";
+type Stage = "seller" | "car" | "buyer" | "documents";
 
 const stageMeta: Record<Stage, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
-  seller: { label: "Seller stage", icon: UserSquare2 },
-  car: { label: "Car stage", icon: CarFront },
-  buyer: { label: "Buyer stage", icon: CircleUserRound },
+  seller: { label: "Seller", icon: UserSquare2 },
+  car: { label: "Car", icon: CarFront },
+  buyer: { label: "Buyer", icon: CircleUserRound },
+  documents: { label: "Documents", icon: FileText },
 };
 
 function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
@@ -22,7 +24,7 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
 }
 
 export function FileWorkspace({ file }: { file: AdminFileRecord }) {
-  const [activeStage, setActiveStage] = useState<Stage>(file.stage);
+  const [activeStage, setActiveStage] = useState<Stage>(file.stage === "buyer" ? "buyer" : file.stage);
 
   return (
     <div className="grid gap-4">
@@ -46,7 +48,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                 <Icon className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Section</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tab</p>
                 <p className="text-sm font-semibold text-slate-900">{stageMeta[stage].label}</p>
               </div>
             </button>
@@ -60,9 +62,9 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
             <h2 className="text-base font-semibold text-slate-900">Seller information</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <InfoRow label="Seller name" value={file.listing.seller?.name} />
-              <InfoRow label="Phone number" value={file.listing.seller?.phone} />
+              <InfoRow label="Phone" value={file.listing.seller?.phone} />
               <InfoRow label="Seller type" value={file.listing.sellerType} />
-              <InfoRow label="Status" value={file.listing.status} />
+              <InfoRow label="Car status" value={file.listing.status} />
               <div className="sm:col-span-2">
                 <InfoRow label="Address" value={file.listing.seller?.address} />
               </div>
@@ -87,7 +89,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <InfoRow label="File number" value={file.fileNumber} />
               <InfoRow label="Number plate" value={file.numberPlate} />
-              <InfoRow label="Make / Model" value={file.carName} />
+              <InfoRow label="Car name" value={file.carName} />
               <InfoRow label="Year" value={file.listing.year} />
               <InfoRow label="Fuel" value={file.listing.fuel} />
               <InfoRow label="Transmission" value={file.listing.transmission} />
@@ -115,7 +117,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
             <h2 className="text-base font-semibold text-slate-900">Buyer information</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <InfoRow label="Buyer name" value={file.listing.buyer?.name} />
-              <InfoRow label="Phone number" value={file.listing.buyer?.phone} />
+              <InfoRow label="Phone" value={file.listing.buyer?.phone} />
               <InfoRow label="Sold price" value={file.listing.buyer?.soldPrice} />
               <InfoRow label="Sale date" value={file.listing.buyer?.saleDate} />
               <div className="sm:col-span-2">
@@ -129,6 +131,50 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
             docTypes={["buyer_id", "other"]}
             file={file}
           />
+        </div>
+      ) : null}
+
+      {activeStage === "documents" ? (
+        <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+          <div className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-slate-900">Document check</h2>
+            <div className="mt-4 grid gap-3">
+              <StageBadge label="Seller Docs" ready={file.documentStatus.sellerReady} />
+              <StageBadge label="Car Docs" ready={file.documentStatus.carReady} />
+              <StageBadge label="Buyer Docs" ready={file.documentStatus.buyerReady} />
+            </div>
+            <Link
+              href={`/admin/files/${file.id}/edit`}
+              className="mt-5 inline-flex rounded-full bg-[#2252e8] px-5 py-3 text-sm font-semibold text-white"
+            >
+              Upload Docs
+            </Link>
+          </div>
+          <div className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-base font-semibold text-slate-900">All uploaded documents</h2>
+              <span className="text-sm text-slate-500">{file.listing.documents.length} file(s)</span>
+            </div>
+            <div className="mt-4 grid gap-3">
+              {file.listing.documents.length ? (
+                file.listing.documents.map((document) => (
+                  <a
+                    key={document.id}
+                    href={document.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-2xl border border-sky-100 bg-sky-50/60 px-4 py-3 text-sm text-slate-700 hover:bg-sky-100"
+                  >
+                    {document.docType}
+                  </a>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-sm text-slate-500">
+                  No documents uploaded yet.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
@@ -181,6 +227,18 @@ function DocPanel({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function StageBadge({ label, ready }: { label: string; ready: boolean }) {
+  return (
+    <div
+      className={`rounded-[20px] px-4 py-3 text-sm font-semibold ${
+        ready ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+      }`}
+    >
+      {label}: {ready ? "Ready" : "Missing"}
     </div>
   );
 }

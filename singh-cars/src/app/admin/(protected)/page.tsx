@@ -10,11 +10,11 @@ export default async function AdminDashboardPage() {
   return (
     <AdminShell>
       <div className="grid gap-4 xl:grid-cols-5">
-        <StatCard label="Total Files" value={summary.totalFiles} hint="All saved car files" accent="blue" />
-        <StatCard label="Cars In Stock" value={summary.carsInStock} hint="Still in file workflow" accent="green" />
-        <StatCard label="Sold Cars" value={summary.soldCars} hint="Completed sale files" accent="orange" />
-        <StatCard label="Missing Buyer Docs" value={summary.filesMissingBuyerDocuments} hint="Files needing buyer update" accent="sky" />
-        <StatCard label="Missing Seller Docs" value={summary.filesMissingSellerDocuments} hint="Files needing seller paperwork" accent="amber" />
+        <StatCard label="Total Files" value={summary.totalFiles} hint="All car files" accent="blue" />
+        <StatCard label="Cars In Stock" value={summary.carsInStock} hint="Cars ready for sale" accent="green" />
+        <StatCard label="Sold Cars" value={summary.soldCars} hint="Cars already sold" accent="orange" />
+        <StatCard label="Missing Buyer Docs" value={summary.filesMissingBuyerDocuments} hint="Files waiting for buyer papers" accent="sky" />
+        <StatCard label="Missing Seller Docs" value={summary.filesMissingSellerDocuments} hint="Files waiting for seller papers" accent="amber" />
       </div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
@@ -25,7 +25,7 @@ export default async function AdminDashboardPage() {
                 Recently Updated Files
               </p>
               <h2 className="mt-2 text-xl font-semibold text-slate-900">
-                Open the files that moved most recently
+                Open the car files you changed last
               </h2>
             </div>
             <Link href="/admin/files" className="inline-flex items-center gap-2 text-sm font-semibold text-sky-700">
@@ -39,13 +39,13 @@ export default async function AdminDashboardPage() {
           <section className="rounded-[30px] border border-sky-100 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <FolderClock className="h-5 w-5 text-sky-600" />
-              <h2 className="text-lg font-semibold text-slate-900">File workflow</h2>
+              <h2 className="text-lg font-semibold text-slate-900">How one car file works</h2>
             </div>
             <div className="mt-5 grid gap-3">
               {[
-                ["Seller stage", "Add seller details and seller documents first."],
-                ["Car stage", "Complete car details, upload photos, and car docs."],
-                ["Buyer stage", "Finish buyer details and buyer-side paperwork."],
+                ["Seller", "Start with seller name, phone, and seller papers."],
+                ["Car", "Add the car details, number plate, price, and photos."],
+                ["Buyer", "When sold, add buyer details and buyer papers."],
               ].map(([title, description]) => (
                 <div key={title} className="rounded-[22px] border border-sky-100 bg-sky-50/50 p-4">
                   <p className="font-semibold text-slate-900">{title}</p>
@@ -58,23 +58,23 @@ export default async function AdminDashboardPage() {
           <section className="rounded-[30px] border border-sky-100 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <UserRoundSearch className="h-5 w-5 text-[#ff8a2e]" />
-              <h2 className="text-lg font-semibold text-slate-900">Quick focus</h2>
+              <h2 className="text-lg font-semibold text-slate-900">What needs attention</h2>
             </div>
             <div className="mt-5 grid gap-3">
               <FocusItem
                 icon={<CircleCheckBig className="h-4 w-4 text-emerald-600" />}
-                title="Complete buyer sections for sold files first"
-                text="Sold cars should not stay stuck with missing buyer documents."
+                title="Finish sold car files first"
+                text="If a car is sold, add the buyer details and papers quickly."
               />
               <FocusItem
                 icon={<FolderOpenDot className="h-4 w-4 text-sky-600" />}
-                title="Search by file number or vehicle identifiers"
-                text="Find a file quickly using stock number, plate, seller, buyer, or phone."
+                title="Search by number plate"
+                text="You can also search by file number, seller name, buyer name, or phone."
               />
               <FocusItem
                 icon={<FolderClock className="h-4 w-4 text-amber-600" />}
-                title="One file, three workflow stages"
-                text="Seller, Car, and Buyer actions all belong to the same digital car file."
+                title="Keep one file for each car"
+                text="Seller, car, buyer, and documents stay together in one simple file."
               />
             </div>
           </section>

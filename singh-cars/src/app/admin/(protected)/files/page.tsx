@@ -22,10 +22,10 @@ export default async function AdminFilesPage({
       <div className="grid gap-5">
         <section className="rounded-[30px] border border-sky-100 bg-white p-6 shadow-sm">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#ff8a2e]">
-            All Deal Files
+            Car Files
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-slate-900">
-            Search by file number, number plate, seller, buyer, or phone
+            Search by Number Plate, file number, seller, buyer, or phone
           </h1>
           <div className="mt-5">
             <FileFilters searchParams={params} />
