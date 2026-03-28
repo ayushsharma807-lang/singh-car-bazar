@@ -314,6 +314,30 @@ export async function updateCarInfoAction(formData: FormData) {
   await redirectToAdminFile(listingId);
 }
 
+export async function markListingSoldAction(formData: FormData) {
+  await requireAdminSession();
+
+  const supabase = createSupabaseAdminClient();
+  const listingId = String(formData.get("listingId") || "");
+
+  if (!listingId) {
+    redirect("/admin/files");
+  }
+
+  if (!supabase) {
+    throw new Error("Unable to update car status.");
+  }
+
+  await supabase
+    .from("listings")
+    .update({
+      status: "sold",
+    })
+    .eq("id", listingId);
+
+  await redirectToAdminFile(listingId);
+}
+
 export async function updateBuyerInfoAction(formData: FormData) {
   await requireAdminSession();
 

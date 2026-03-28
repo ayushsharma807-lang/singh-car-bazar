@@ -123,10 +123,10 @@ function FloatingAddButton() {
     <Link
       href="/admin/files/new"
       className="admin-btn fixed bottom-5 right-5 z-40 shadow-sm lg:hidden"
-      title="Add Car"
+      title="New File"
     >
       <FilePlus2 className="h-5 w-5" />
-      Add Car
+      New File
     </Link>
   );
 }

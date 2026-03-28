@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { markListingSoldAction } from "@/app/admin/actions";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { FileWorkspace } from "@/components/admin/file-workspace";
 import { StatusPill } from "@/components/admin/status-pill";
@@ -23,27 +23,25 @@ export default async function AdminFileDetailPage({
     <AdminShell>
       <div className="grid gap-5">
         <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gray-500">
                 File {file.fileNumber}
               </p>
-              <h1 className="mt-2 text-2xl font-semibold text-black">
-                {file.carName}
-              </h1>
-              <p className="mt-2 text-sm text-gray-600">
-                {file.numberPlate} · Seller: {file.sellerName} · Buyer: {file.buyerName ?? "Pending"}
-              </p>
+              <div className="mt-3">
+                <StatusPill status={file.status} />
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <StatusPill status={file.status} />
-              <Link
-                href={`/admin/files/${file.id}/edit`}
-                className="admin-btn"
+            <form action={markListingSoldAction}>
+              <input type="hidden" name="listingId" value={file.id} />
+              <button
+                type="submit"
+                className="admin-btn h-12 px-5 text-base"
+                disabled={file.status === "sold"}
               >
-                Full Edit Page
-              </Link>
-            </div>
+                {file.status === "sold" ? "Already Sold" : "Mark as Sold"}
+              </button>
+            </form>
           </div>
         </section>
 
