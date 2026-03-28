@@ -29,6 +29,42 @@ async function uploadFile(bucket: string, path: string, file: File) {
   return result.publicUrl;
 }
 
+async function ensureStorageBucket(bucket: string) {
+  const supabase = createSupabaseAdminClient();
+
+  if (!supabase) {
+    return {
+      ok: false,
+      error: "Upload client is not ready.",
+    };
+  }
+
+  const { data: existingBucket } = await supabase.storage.getBucket(bucket);
+
+  if (existingBucket) {
+    return {
+      ok: true,
+      error: null,
+    };
+  }
+
+  const { error } = await supabase.storage.createBucket(bucket, {
+    public: bucket === "listing-photos" || bucket === "documents",
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message,
+    };
+  }
+
+  return {
+    ok: true,
+    error: null,
+  };
+}
+
 async function uploadFileWithResult(bucket: string, path: string, file: File) {
   const supabase = createSupabaseAdminClient();
 
@@ -36,6 +72,15 @@ async function uploadFileWithResult(bucket: string, path: string, file: File) {
     return {
       publicUrl: null,
       error: "Upload client is not ready.",
+    };
+  }
+
+  const bucketReady = await ensureStorageBucket(bucket);
+
+  if (!bucketReady.ok) {
+    return {
+      publicUrl: null,
+      error: bucketReady.error || "Bucket setup failed.",
     };
   }
 

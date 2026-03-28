@@ -194,7 +194,7 @@ values ('listing-photos', 'listing-photos', true)
 on conflict (id) do nothing;
 
 insert into storage.buckets (id, name, public)
-values ('documents', 'documents', false)
+values ('documents', 'documents', true)
 on conflict (id) do nothing;
 
 drop policy if exists "Public can view listing images bucket" on storage.objects;
