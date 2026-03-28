@@ -801,6 +801,7 @@ export async function uploadListingImagesInlineAction(formData: FormData) {
 
   let coverImageUrl = listing?.cover_image_url ?? null;
   let uploadedCount = 0;
+  const uploadedImages: { id: string; listingId: string; imageUrl: string; sortOrder: number }[] = [];
 
   for (const file of files) {
     if (!file.type.startsWith("image/")) {
@@ -815,14 +816,27 @@ export async function uploadListingImagesInlineAction(formData: FormData) {
       continue;
     }
 
-    await supabase.from("listing_images").insert({
-      listing_id: listingId,
-      image_url: uploadResult.publicUrl,
-      sort_order: nextSortOrder,
-    });
+    const { data: insertedImage } = await supabase
+      .from("listing_images")
+      .insert({
+        listing_id: listingId,
+        image_url: uploadResult.publicUrl,
+        sort_order: nextSortOrder,
+      })
+      .select("id,image_url,sort_order")
+      .single();
 
     if (!coverImageUrl) {
       coverImageUrl = uploadResult.publicUrl;
+    }
+
+    if (insertedImage) {
+      uploadedImages.push({
+        id: insertedImage.id,
+        listingId,
+        imageUrl: insertedImage.image_url,
+        sortOrder: insertedImage.sort_order,
+      });
     }
 
     nextSortOrder += 1;
@@ -848,6 +862,73 @@ export async function uploadListingImagesInlineAction(formData: FormData) {
   return {
     success: true,
     message: `${uploadedCount} photo${uploadedCount > 1 ? "s" : ""} uploaded successfully.`,
+    images: uploadedImages,
+  };
+}
+
+export async function removeListingImageByIdAction(formData: FormData) {
+  await requireAdminSession();
+
+  const supabase = createSupabaseAdminClient();
+  const listingId = String(formData.get("listingId") || "");
+  const imageId = String(formData.get("imageId") || "");
+
+  if (!listingId || !imageId) {
+    return {
+      success: false,
+      message: "Photo remove request is missing details.",
+    };
+  }
+
+  if (!supabase) {
+    return {
+      success: false,
+      message: "Supabase admin connection is missing.",
+    };
+  }
+
+  const { data: image } = await supabase
+    .from("listing_images")
+    .select("image_url")
+    .eq("id", imageId)
+    .maybeSingle();
+
+  if (!image) {
+    return {
+      success: false,
+      message: "Photo was not found.",
+    };
+  }
+
+  await deletePublicFile("listing-photos", image.image_url);
+  const { error } = await supabase.from("listing_images").delete().eq("id", imageId);
+
+  if (error) {
+    return {
+      success: false,
+      message: error.message,
+    };
+  }
+
+  const { data: remainingImages } = await supabase
+    .from("listing_images")
+    .select("image_url,sort_order")
+    .eq("listing_id", listingId)
+    .order("sort_order", { ascending: true });
+
+  await supabase
+    .from("listings")
+    .update({
+      cover_image_url: remainingImages?.[0]?.image_url ?? null,
+    })
+    .eq("id", listingId);
+
+  await revalidateAdminFilePaths(listingId);
+
+  return {
+    success: true,
+    message: "Photo removed.",
+    imageId,
   };
 }
 
