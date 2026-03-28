@@ -6,9 +6,14 @@ import { cn } from "@/lib/utils";
 type SiteShellProps = {
   children: ReactNode;
   currentPath?: string;
+  compactFooter?: boolean;
 };
 
-export function SiteShell({ children, currentPath = "/" }: SiteShellProps) {
+export function SiteShell({
+  children,
+  currentPath = "/",
+  compactFooter = false,
+}: SiteShellProps) {
   return (
     <div className="min-h-screen bg-[#f7f9fc] text-slate-900">
       <div className="bg-[#ff8a2e] text-white">
@@ -50,46 +55,58 @@ export function SiteShell({ children, currentPath = "/" }: SiteShellProps) {
         </div>
       </header>
       {children}
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1.1fr_0.9fr_0.9fr] lg:px-8">
-          <div>
-            <p className="font-display text-4xl uppercase tracking-[0.1em] text-[#2252e8]">
-              {siteConfig.businessName}
-            </p>
-            <p className="mt-4 max-w-md text-base leading-8 text-slate-600">
-              Used car buying, selling, finance support, insurance help, and live listings managed from one system.
-            </p>
-          </div>
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#ff8a2e]">
-              Contact
-            </p>
-            <div className="mt-4 grid gap-3 text-slate-600">
-              <p>{siteConfig.address}</p>
+      {compactFooter ? (
+        <footer className="border-t border-slate-200 bg-white">
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 text-sm text-slate-600 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+            <p className="font-semibold text-slate-900">{siteConfig.businessName}</p>
+            <div className="flex flex-wrap gap-4">
               <a href={siteConfig.phoneHref}>{siteConfig.phone}</a>
               <a href={`mailto:${siteConfig.email}`}>{siteConfig.email}</a>
             </div>
           </div>
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#ff8a2e]">
-              Socials
-            </p>
-            <div className="mt-4 flex flex-wrap gap-3">
-              {siteConfig.socials.map((social) => (
-                <a
-                  key={social.label}
-                  href={social.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:bg-[#2252e8] hover:text-white"
-                >
-                  {social.label}
-                </a>
-              ))}
+        </footer>
+      ) : (
+        <footer className="border-t border-slate-200 bg-white">
+          <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1.1fr_0.9fr_0.9fr] lg:px-8">
+            <div>
+              <p className="font-display text-4xl uppercase tracking-[0.1em] text-[#2252e8]">
+                {siteConfig.businessName}
+              </p>
+              <p className="mt-4 max-w-md text-base leading-8 text-slate-600">
+                Used car buying, selling, finance support, insurance help, and live listings managed from one system.
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#ff8a2e]">
+                Contact
+              </p>
+              <div className="mt-4 grid gap-3 text-slate-600">
+                <p>{siteConfig.address}</p>
+                <a href={siteConfig.phoneHref}>{siteConfig.phone}</a>
+                <a href={`mailto:${siteConfig.email}`}>{siteConfig.email}</a>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#ff8a2e]">
+                Socials
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                {siteConfig.socials.map((social) => (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:bg-[#2252e8] hover:text-white"
+                  >
+                    {social.label}
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
       <a
         href={`https://wa.me/${siteConfig.whatsappNumber}`}
         target="_blank"
