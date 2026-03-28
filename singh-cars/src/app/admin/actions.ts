@@ -634,33 +634,29 @@ export async function uploadDocumentInlineAction(formData: FormData) {
     "image/jpeg",
     "image/png",
     "image/jpg",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   ];
 
-  if (!allowedTypes.includes(file.type)) {
+  const hasAllowedExtension = [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".doc", ".docx"]
+    .some((extension) => file.name.toLowerCase().endsWith(extension));
+
+  if (!allowedTypes.includes(file.type) && !hasAllowedExtension) {
     return {
       success: false,
-      message: "Please upload a PDF, JPG, or PNG file.",
+      message: "Please upload PDF, JPG, PNG, WEBP, HEIC, DOC, or DOCX.",
     };
   }
 
-  const { data: existingDocs } = await supabase
-    .from("documents")
-    .select("id,file_url")
-    .eq("listing_id", listingId)
-    .eq("doc_type", docType);
-
-  for (const document of existingDocs ?? []) {
-    await deletePublicFile("documents", document.file_url);
-  }
-
-  await supabase
-    .from("documents")
-    .delete()
-    .eq("listing_id", listingId)
-    .eq("doc_type", docType);
-
   const extension = file.name.split(".").pop() || "pdf";
-  const path = `${listingId}/${docType}-${randomUUID()}.${extension}`;
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+  const folder =
+    docType === "seller_id" ? "seller-docs" : docType === "buyer_id" ? "buyer-docs" : "documents";
+  const finalName = safeName.includes(".") ? safeName : `${safeName}.${extension}`;
+  const path = `${folder}/${listingId}/${Date.now()}-${finalName}`;
   const uploadResult = await uploadFileWithResult("documents", path, file);
 
   if (!uploadResult.publicUrl) {
@@ -670,12 +666,78 @@ export async function uploadDocumentInlineAction(formData: FormData) {
     };
   }
 
-  const { error } = await supabase.from("documents").insert({
-    listing_id: listingId,
-    doc_type: docType,
-    file_url: uploadResult.publicUrl,
-    notes: null,
+  const notePayload = JSON.stringify({
+    originalName: file.name,
+    mimeType: file.type || null,
   });
+
+  const { data: insertedDocument, error } = await supabase
+    .from("documents")
+    .insert({
+      listing_id: listingId,
+      doc_type: docType,
+      file_url: uploadResult.publicUrl,
+      notes: notePayload,
+    })
+    .select("id,listing_id,doc_type,file_url,notes")
+    .single();
+
+  if (error || !insertedDocument) {
+    return {
+      success: false,
+      message: error?.message || "Document could not be saved.",
+    };
+  }
+
+  await revalidateAdminFilePaths(listingId);
+
+  return {
+    success: true,
+    message: `${file.name} uploaded successfully.`,
+    documentId: insertedDocument.id,
+    fileName: file.name,
+    fileUrl: uploadResult.publicUrl,
+    docType,
+    notes: notePayload,
+  };
+}
+
+export async function removeDocumentByIdAction(formData: FormData) {
+  await requireAdminSession();
+
+  const supabase = createSupabaseAdminClient();
+  const listingId = String(formData.get("listingId") || "");
+  const documentId = String(formData.get("documentId") || "");
+
+  if (!listingId || !documentId) {
+    return {
+      success: false,
+      message: "File remove request is missing details.",
+    };
+  }
+
+  if (!supabase) {
+    return {
+      success: false,
+      message: "Supabase admin connection is missing.",
+    };
+  }
+
+  const { data: document } = await supabase
+    .from("documents")
+    .select("id,file_url")
+    .eq("id", documentId)
+    .maybeSingle();
+
+  if (!document) {
+    return {
+      success: false,
+      message: "File was not found.",
+    };
+  }
+
+  await deletePublicFile("documents", document.file_url);
+  const { error } = await supabase.from("documents").delete().eq("id", documentId);
 
   if (error) {
     return {
@@ -688,9 +750,8 @@ export async function uploadDocumentInlineAction(formData: FormData) {
 
   return {
     success: true,
-    message: `${file.name} uploaded successfully.`,
-    fileName: file.name,
-    fileUrl: uploadResult.publicUrl,
+    message: "File removed.",
+    documentId,
   };
 }
 

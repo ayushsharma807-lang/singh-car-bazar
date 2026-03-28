@@ -3,10 +3,17 @@
 import type { ReactNode } from "react";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CarFront, Check, ChevronDown, CircleUserRound, IndianRupee } from "lucide-react";
+import {
+  CarFront,
+  Check,
+  ChevronDown,
+  CircleUserRound,
+  FileText,
+  IndianRupee,
+} from "lucide-react";
 import type { AdminFileRecord, ListingDocument } from "@/types";
 import {
-  removeDocumentAction,
+  removeDocumentByIdAction,
   removeListingImageAction,
   uploadDocumentInlineAction,
   uploadListingImagesInlineAction,
@@ -16,6 +23,22 @@ import {
 } from "@/app/admin/actions";
 
 type FileStep = "seller" | "car" | "buyer";
+
+type UploadResult = {
+  success: boolean;
+  message: string;
+  fileName?: string;
+  fileUrl?: string;
+  docType?: string;
+  notes?: string;
+  documentId?: string;
+};
+
+type RemoveResult = {
+  success: boolean;
+  message: string;
+  documentId?: string;
+};
 
 function getFileName(url: string) {
   try {
@@ -58,6 +81,41 @@ function getLatestDocument(documents: ListingDocument[], docType: string) {
   return documents.find((document) => document.docType === docType) ?? null;
 }
 
+function getDocumentsByType(documents: ListingDocument[], docType: string) {
+  return documents.filter((document) => document.docType === docType);
+}
+
+function getDocumentMeta(document: ListingDocument) {
+  const fallbackName = getFileName(document.fileUrl)
+    .replace(/^\d+-/, "")
+    .replace(/^[^-]+-/, "");
+
+  try {
+    const parsed = document.notes ? JSON.parse(document.notes) : null;
+
+    return {
+      fileName: parsed?.originalName || fallbackName,
+      mimeType: parsed?.mimeType || "",
+    };
+  } catch {
+    return {
+      fileName: fallbackName,
+      mimeType: "",
+    };
+  }
+}
+
+function isImageDocument(document: ListingDocument) {
+  const meta = getDocumentMeta(document);
+  const name = meta.fileName.toLowerCase();
+  const mime = meta.mimeType.toLowerCase();
+
+  return (
+    mime.startsWith("image/") ||
+    [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"].some((ext) => name.endsWith(ext))
+  );
+}
+
 function UploadPicker({
   action,
   listingId,
@@ -66,16 +124,16 @@ function UploadPicker({
   accept,
   multiple = false,
   extraFields,
+  onSuccess,
 }: {
-  action: (
-    formData: FormData,
-  ) => Promise<{ success: boolean; message: string; fileName?: string; fileUrl?: string }>;
+  action: (formData: FormData) => Promise<UploadResult>;
   listingId: string;
   buttonLabel: string;
   inputName: string;
   accept?: string;
   multiple?: boolean;
   extraFields?: { name: string; value: string }[];
+  onSuccess?: (result: UploadResult) => void;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -134,10 +192,13 @@ function UploadPicker({
                 tone: "success",
                 message: result.message,
               });
+              onSuccess?.(result);
 
-              window.setTimeout(() => {
-                router.refresh();
-              }, 700);
+              if (!onSuccess) {
+                window.setTimeout(() => {
+                  router.refresh();
+                }, 700);
+              }
             } else {
               setFeedback({
                 tone: "error",
@@ -269,24 +330,84 @@ function StepShell({
   );
 }
 
-function DocRow({
+function SellerDocCard({
+  document,
+  listingId,
+  onRemove,
+}: {
+  document: ListingDocument;
+  listingId: string;
+  onRemove: (documentId: string) => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const meta = getDocumentMeta(document);
+  const image = isImageDocument(document);
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      {image ? (
+        <a href={document.fileUrl} target="_blank" rel="noreferrer" className="block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={document.fileUrl} alt={meta.fileName} className="h-28 w-full object-cover" />
+        </a>
+      ) : (
+        <div className="flex h-28 items-center justify-center bg-gray-50 text-gray-500">
+          <FileText className="h-8 w-8" />
+        </div>
+      )}
+      <div className="grid gap-3 p-4">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-black">{meta.fileName}</p>
+          <p className="mt-1 text-xs text-gray-500">{image ? "Image file" : "Document file"}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <a href={document.fileUrl} target="_blank" rel="noreferrer" className="admin-btn admin-btn-sm">
+            Open
+          </a>
+          <button
+            type="button"
+            className="admin-btn admin-btn-sm"
+            disabled={isPending}
+            onClick={() =>
+              startTransition(async () => {
+                const formData = new FormData();
+                formData.set("listingId", listingId);
+                formData.set("documentId", document.id);
+                const result = (await removeDocumentByIdAction(formData)) as RemoveResult;
+
+                if (result.success) {
+                  onRemove(document.id);
+                }
+              })
+            }
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SingleDocRow({
   title,
   document,
   listingId,
-  docType,
 }: {
   title: string;
   document: ListingDocument | null;
   listingId: string;
-  docType: string;
 }) {
+  const [isPending, startTransition] = useTransition();
+  const meta = document ? getDocumentMeta(document) : null;
+
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-black">{title}</p>
           <p className="mt-1 truncate text-sm text-gray-600">
-            {document ? getFileName(document.fileUrl) : "No file uploaded yet"}
+            {meta ? meta.fileName : "No file uploaded yet"}
           </p>
         </div>
         {document ? (
@@ -294,13 +415,21 @@ function DocRow({
             <a href={document.fileUrl} target="_blank" rel="noreferrer" className="admin-btn admin-btn-sm">
               Open
             </a>
-            <form action={removeDocumentAction}>
-              <input type="hidden" name="listingId" value={listingId} />
-              <input type="hidden" name="docType" value={docType} />
-              <button type="submit" className="admin-btn admin-btn-sm">
-                Remove
-              </button>
-            </form>
+            <button
+              type="button"
+              className="admin-btn admin-btn-sm"
+              disabled={isPending}
+              onClick={() =>
+                startTransition(async () => {
+                  const formData = new FormData();
+                  formData.set("listingId", listingId);
+                  formData.set("documentId", document.id);
+                  await removeDocumentByIdAction(formData);
+                })
+              }
+            >
+              Remove
+            </button>
           </div>
         ) : null}
       </div>
@@ -309,8 +438,8 @@ function DocRow({
 }
 
 export function FileWorkspace({ file }: { file: AdminFileRecord }) {
-  const sellerDoc = useMemo(
-    () => getLatestDocument(file.listing.documents, "seller_id"),
+  const initialSellerDocs = useMemo(
+    () => getDocumentsByType(file.listing.documents, "seller_id"),
     [file.listing.documents],
   );
   const buyerDoc = useMemo(
@@ -322,7 +451,12 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
     [file.listing.buyer?.notes],
   );
   const photos = file.listing.images;
-  const sellerDone = Boolean(file.listing.seller?.name && file.listing.seller?.phone);
+  const [sellerDraft, setSellerDraft] = useState({
+    name: file.listing.seller?.name ?? "",
+    phone: file.listing.seller?.phone ?? "",
+  });
+  const [sellerDocs, setSellerDocs] = useState<ListingDocument[]>(initialSellerDocs);
+  const sellerDone = Boolean(sellerDraft.name.trim() && sellerDraft.phone.trim());
   const carDone = Boolean(file.listing.model && file.listing.numberPlate && file.listing.price);
   const showBuyerStep = file.listing.status === "sold";
   const buyerDone = Boolean(
@@ -354,7 +488,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
       <StepShell
         icon={<CircleUserRound className="h-5 w-5" />}
         title="Step 1 — Seller"
-        emptyText={sellerDone ? "Seller details are saved." : "No seller added"}
+        emptyText={sellerDone ? "Seller details are ready." : "No seller added"}
         actionLabel={sellerDone ? "Edit Seller" : "+ Add Seller"}
         isOpen={activeStep === "seller"}
         onToggle={() => setActiveStep("seller")}
@@ -362,11 +496,11 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
           <>
             <SummaryLine
               label="Seller Name"
-              value={file.listing.seller?.name?.trim() || "No seller added"}
+              value={sellerDraft.name.trim() || "No seller added"}
             />
             <SummaryLine
               label="Phone"
-              value={file.listing.seller?.phone?.trim() || "No seller added"}
+              value={sellerDraft.phone.trim() || "No seller added"}
             />
           </>
         }
@@ -379,7 +513,10 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
               <input
                 className="admin-field h-12"
                 name="sellerName"
-                defaultValue={file.listing.seller?.name ?? ""}
+                value={sellerDraft.name}
+                onChange={(event) =>
+                  setSellerDraft((current) => ({ ...current, name: event.target.value }))
+                }
                 required
               />
             </label>
@@ -388,7 +525,10 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
               <input
                 className="admin-field h-12"
                 name="sellerPhone"
-                defaultValue={file.listing.seller?.phone ?? ""}
+                value={sellerDraft.phone}
+                onChange={(event) =>
+                  setSellerDraft((current) => ({ ...current, phone: event.target.value }))
+                }
                 required
               />
             </label>
@@ -396,12 +536,14 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
           <input type="hidden" name="sellerAddress" value={file.listing.seller?.address ?? ""} />
           <input type="hidden" name="sellerNotes" value={file.listing.seller?.notes ?? ""} />
 
-          <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+          <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-sm font-semibold text-black">Seller documents</p>
                 <p className="text-sm text-gray-600">
-                  {sellerDoc ? "Seller docs uploaded" : "No seller docs uploaded yet"}
+                  {sellerDocs.length
+                    ? `${sellerDocs.length} file${sellerDocs.length > 1 ? "s" : ""} uploaded`
+                    : "No seller docs uploaded yet"}
                 </p>
               </div>
               <UploadPicker
@@ -409,17 +551,45 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                 listingId={file.id}
                 buttonLabel="Upload Seller Docs"
                 inputName="file"
-                accept=".pdf,.jpg,.jpeg,.png"
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx"
                 extraFields={[{ name: "docType", value: "seller_id" }]}
+                onSuccess={(result) => {
+                  if (result.success && result.documentId && result.fileUrl) {
+                    const documentId = result.documentId;
+                    const fileUrl = result.fileUrl;
+                    setSellerDocs((current) => [
+                      ...current,
+                      {
+                        id: documentId,
+                        listingId: file.id,
+                        docType: result.docType || "seller_id",
+                        fileUrl,
+                        notes: result.notes || null,
+                      },
+                    ]);
+                  }
+                }}
               />
             </div>
 
-            <DocRow
-              title="Seller docs"
-              document={sellerDoc}
-              listingId={file.id}
-              docType="seller_id"
-            />
+            {sellerDocs.length ? (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {sellerDocs.map((document) => (
+                  <SellerDocCard
+                    key={document.id}
+                    document={document}
+                    listingId={file.id}
+                    onRemove={(documentId) =>
+                      setSellerDocs((current) => current.filter((entry) => entry.id !== documentId))
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-sm text-gray-600">
+                No seller docs uploaded yet
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -473,78 +643,35 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
           <div className="grid gap-4 md:grid-cols-2">
             <label>
               <span className="mb-2 block text-sm font-semibold text-gray-800">Number Plate</span>
-              <input
-                className="admin-field h-12"
-                name="numberPlate"
-                defaultValue={file.listing.numberPlate}
-                required
-              />
+              <input className="admin-field h-12" name="numberPlate" defaultValue={file.listing.numberPlate} required />
             </label>
             <label>
               <span className="mb-2 block text-sm font-semibold text-gray-800">Make</span>
-              <input
-                className="admin-field h-12"
-                name="make"
-                defaultValue={file.listing.make}
-                required
-              />
+              <input className="admin-field h-12" name="make" defaultValue={file.listing.make} required />
             </label>
             <label>
               <span className="mb-2 block text-sm font-semibold text-gray-800">Model</span>
-              <input
-                className="admin-field h-12"
-                name="model"
-                defaultValue={file.listing.model}
-                required
-              />
+              <input className="admin-field h-12" name="model" defaultValue={file.listing.model} required />
             </label>
             <label>
               <span className="mb-2 block text-sm font-semibold text-gray-800">Year</span>
-              <input
-                className="admin-field h-12"
-                type="number"
-                name="year"
-                defaultValue={file.listing.year}
-                required
-              />
+              <input className="admin-field h-12" type="number" name="year" defaultValue={file.listing.year} required />
             </label>
             <label>
               <span className="mb-2 block text-sm font-semibold text-gray-800">KM</span>
-              <input
-                className="admin-field h-12"
-                type="number"
-                name="kmDriven"
-                defaultValue={file.listing.kmDriven}
-                required
-              />
+              <input className="admin-field h-12" type="number" name="kmDriven" defaultValue={file.listing.kmDriven} required />
             </label>
             <label>
               <span className="mb-2 block text-sm font-semibold text-gray-800">Fuel</span>
-              <input
-                className="admin-field h-12"
-                name="fuel"
-                defaultValue={file.listing.fuel}
-                required
-              />
+              <input className="admin-field h-12" name="fuel" defaultValue={file.listing.fuel} required />
             </label>
             <label>
               <span className="mb-2 block text-sm font-semibold text-gray-800">Transmission</span>
-              <input
-                className="admin-field h-12"
-                name="transmission"
-                defaultValue={file.listing.transmission}
-                required
-              />
+              <input className="admin-field h-12" name="transmission" defaultValue={file.listing.transmission} required />
             </label>
             <label>
               <span className="mb-2 block text-sm font-semibold text-gray-800">Price</span>
-              <input
-                className="admin-field h-12"
-                type="number"
-                name="price"
-                defaultValue={file.listing.price}
-                required
-              />
+              <input className="admin-field h-12" type="number" name="price" defaultValue={file.listing.price} required />
             </label>
             <label>
               <span className="mb-2 block text-sm font-semibold text-gray-800">Status</span>
@@ -569,7 +696,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                 listingId={file.id}
                 buttonLabel="Upload Car Photos"
                 inputName="images"
-                accept=".jpg,.jpeg,.png"
+                accept=".jpg,.jpeg,.png,.webp,.heic"
                 multiple
               />
             </div>
@@ -625,14 +752,8 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
           onToggle={() => setActiveStep("buyer")}
           summary={
             <>
-              <SummaryLine
-                label="Buyer Name"
-                value={file.listing.buyer?.name?.trim() || "No buyer added"}
-              />
-              <SummaryLine
-                label="Phone"
-                value={file.listing.buyer?.phone?.trim() || "No buyer added"}
-              />
+              <SummaryLine label="Buyer Name" value={file.listing.buyer?.name?.trim() || "No buyer added"} />
+              <SummaryLine label="Phone" value={file.listing.buyer?.phone?.trim() || "No buyer added"} />
               <SummaryLine
                 label="Sold Price"
                 value={file.listing.buyer?.soldPrice ? formatPrice(file.listing.buyer.soldPrice) : "No buyer added"}
@@ -650,28 +771,15 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
             <div className="grid gap-4 md:grid-cols-2">
               <label>
                 <span className="mb-2 block text-sm font-semibold text-gray-800">Buyer Name</span>
-                <input
-                  className="admin-field h-12"
-                  name="buyerName"
-                  defaultValue={file.listing.buyer?.name ?? ""}
-                />
+                <input className="admin-field h-12" name="buyerName" defaultValue={file.listing.buyer?.name ?? ""} />
               </label>
               <label>
                 <span className="mb-2 block text-sm font-semibold text-gray-800">Phone</span>
-                <input
-                  className="admin-field h-12"
-                  name="buyerPhone"
-                  defaultValue={file.listing.buyer?.phone ?? ""}
-                />
+                <input className="admin-field h-12" name="buyerPhone" defaultValue={file.listing.buyer?.phone ?? ""} />
               </label>
               <label>
                 <span className="mb-2 block text-sm font-semibold text-gray-800">Sold Price</span>
-                <input
-                  className="admin-field h-12"
-                  type="number"
-                  name="soldPrice"
-                  defaultValue={file.listing.buyer?.soldPrice ?? ""}
-                />
+                <input className="admin-field h-12" type="number" name="soldPrice" defaultValue={file.listing.buyer?.soldPrice ?? ""} />
               </label>
             </div>
 
@@ -688,16 +796,15 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                   listingId={file.id}
                   buttonLabel="Upload Buyer Docs"
                   inputName="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx"
                   extraFields={[{ name: "docType", value: "buyer_id" }]}
                 />
               </div>
 
-              <DocRow
+              <SingleDocRow
                 title="Buyer docs"
                 document={buyerDoc}
                 listingId={file.id}
-                docType="buyer_id"
               />
             </div>
 
