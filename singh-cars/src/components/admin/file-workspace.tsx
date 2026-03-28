@@ -1,17 +1,18 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { CarFront, Check, ChevronDown, CircleUserRound, IndianRupee } from "lucide-react";
 import type { AdminFileRecord, ListingDocument } from "@/types";
 import {
   removeDocumentAction,
   removeListingImageAction,
-  replaceDocumentAction,
+  uploadDocumentInlineAction,
+  uploadListingImagesInlineAction,
   updateBuyerInfoAction,
   updateCarInfoAction,
   updateSellerInfoAction,
-  uploadListingImagesAction,
 } from "@/app/admin/actions";
 
 type FileStep = "seller" | "car" | "buyer";
@@ -66,7 +67,9 @@ function UploadPicker({
   multiple = false,
   extraFields,
 }: {
-  action: (formData: FormData) => void | Promise<void>;
+  action: (
+    formData: FormData,
+  ) => Promise<{ success: boolean; message: string; fileName?: string; fileUrl?: string }>;
   listingId: string;
   buttonLabel: string;
   inputName: string;
@@ -74,14 +77,19 @@ function UploadPicker({
   multiple?: boolean;
   extraFields?: { name: string; value: string }[];
 }) {
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [feedback, setFeedback] = useState<{
+    tone: "idle" | "success" | "error";
+    message: string;
+  }>({
+    tone: "idle",
+    message: "",
+  });
 
   return (
-    <form action={action}>
-      <input type="hidden" name="listingId" value={listingId} />
-      {extraFields?.map((field) => (
-        <input key={field.name} type="hidden" name={field.name} value={field.value} />
-      ))}
+    <div className="grid gap-2">
       <input
         ref={inputRef}
         type="file"
@@ -96,17 +104,73 @@ function UploadPicker({
             return;
           }
 
-          event.currentTarget.form?.requestSubmit();
+          const uploadFormData = new FormData();
+          uploadFormData.set("listingId", listingId);
+          extraFields?.forEach((field) => {
+            uploadFormData.set(field.name, field.value);
+          });
+
+          if (multiple) {
+            for (const file of files) {
+              uploadFormData.append(inputName, file);
+            }
+          } else {
+            uploadFormData.set(inputName, files[0]);
+          }
+
+          setFeedback({
+            tone: "idle",
+            message:
+              files.length > 1
+                ? `Uploading ${files.length} files...`
+                : `Uploading ${files[0]?.name || "file"}...`,
+          });
+
+          startTransition(async () => {
+            const result = await action(uploadFormData);
+
+            if (result.success) {
+              setFeedback({
+                tone: "success",
+                message: result.message,
+              });
+
+              window.setTimeout(() => {
+                router.refresh();
+              }, 700);
+            } else {
+              setFeedback({
+                tone: "error",
+                message: result.message,
+              });
+            }
+          });
+
+          event.currentTarget.value = "";
         }}
       />
       <button
         type="button"
         className="admin-btn h-12 px-4 text-sm"
+        disabled={isPending}
         onClick={() => inputRef.current?.click()}
       >
-        {buttonLabel}
+        {isPending ? "Uploading..." : buttonLabel}
       </button>
-    </form>
+      {feedback.message ? (
+        <p
+          className={`text-sm ${
+            feedback.tone === "error"
+              ? "text-red-600"
+              : feedback.tone === "success"
+                ? "text-green-700"
+                : "text-gray-500"
+          }`}
+        >
+          {feedback.message}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -341,10 +405,11 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                 </p>
               </div>
               <UploadPicker
-                action={replaceDocumentAction}
+                action={uploadDocumentInlineAction}
                 listingId={file.id}
                 buttonLabel="Upload Seller Docs"
                 inputName="file"
+                accept=".pdf,.jpg,.jpeg,.png"
                 extraFields={[{ name: "docType", value: "seller_id" }]}
               />
             </div>
@@ -500,11 +565,11 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                 </p>
               </div>
               <UploadPicker
-                action={uploadListingImagesAction}
+                action={uploadListingImagesInlineAction}
                 listingId={file.id}
                 buttonLabel="Upload Car Photos"
                 inputName="images"
-                accept="image/*"
+                accept=".jpg,.jpeg,.png"
                 multiple
               />
             </div>
@@ -619,10 +684,11 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                   </p>
                 </div>
                 <UploadPicker
-                  action={replaceDocumentAction}
+                  action={uploadDocumentInlineAction}
                   listingId={file.id}
                   buttonLabel="Upload Buyer Docs"
                   inputName="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
                   extraFields={[{ name: "docType", value: "buyer_id" }]}
                 />
               </div>

@@ -25,10 +25,18 @@ async function requireAdminSession() {
 }
 
 async function uploadFile(bucket: string, path: string, file: File) {
+  const result = await uploadFileWithResult(bucket, path, file);
+  return result.publicUrl;
+}
+
+async function uploadFileWithResult(bucket: string, path: string, file: File) {
   const supabase = createSupabaseAdminClient();
 
   if (!supabase || !file.size) {
-    return null;
+    return {
+      publicUrl: null,
+      error: "Upload client is not ready.",
+    };
   }
 
   const arrayBuffer = await file.arrayBuffer();
@@ -38,11 +46,17 @@ async function uploadFile(bucket: string, path: string, file: File) {
   });
 
   if (error) {
-    return null;
+    return {
+      publicUrl: null,
+      error: error.message,
+    };
   }
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-  return data.publicUrl;
+  return {
+    publicUrl: data.publicUrl,
+    error: null,
+  };
 }
 
 function getStoragePathFromPublicUrl(bucket: string, publicUrl: string) {
@@ -532,6 +546,203 @@ export async function replaceDocumentAction(formData: FormData) {
   }
 
   await redirectToAdminFile(listingId);
+}
+
+export async function uploadDocumentInlineAction(formData: FormData) {
+  await requireAdminSession();
+
+  const supabase = createSupabaseAdminClient();
+  const listingId = String(formData.get("listingId") || "");
+  const docType = String(formData.get("docType") || "");
+  const file = formData.get("file");
+
+  if (!listingId) {
+    return {
+      success: false,
+      message: "Car file was not found.",
+    };
+  }
+
+  if (!(file instanceof File) || !file.size) {
+    return {
+      success: false,
+      message: "Please choose a file first.",
+    };
+  }
+
+  if (!docType) {
+    return {
+      success: false,
+      message: "Document type is missing.",
+    };
+  }
+
+  if (!supabase) {
+    return {
+      success: false,
+      message: "Supabase admin connection is missing.",
+    };
+  }
+
+  const allowedTypes = [
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/jpg",
+  ];
+
+  if (!allowedTypes.includes(file.type)) {
+    return {
+      success: false,
+      message: "Please upload a PDF, JPG, or PNG file.",
+    };
+  }
+
+  const { data: existingDocs } = await supabase
+    .from("documents")
+    .select("id,file_url")
+    .eq("listing_id", listingId)
+    .eq("doc_type", docType);
+
+  for (const document of existingDocs ?? []) {
+    await deletePublicFile("documents", document.file_url);
+  }
+
+  await supabase
+    .from("documents")
+    .delete()
+    .eq("listing_id", listingId)
+    .eq("doc_type", docType);
+
+  const extension = file.name.split(".").pop() || "pdf";
+  const path = `${listingId}/${docType}-${randomUUID()}.${extension}`;
+  const uploadResult = await uploadFileWithResult("documents", path, file);
+
+  if (!uploadResult.publicUrl) {
+    return {
+      success: false,
+      message: uploadResult.error || "Document upload failed.",
+    };
+  }
+
+  const { error } = await supabase.from("documents").insert({
+    listing_id: listingId,
+    doc_type: docType,
+    file_url: uploadResult.publicUrl,
+    notes: null,
+  });
+
+  if (error) {
+    return {
+      success: false,
+      message: error.message,
+    };
+  }
+
+  await revalidateAdminFilePaths(listingId);
+
+  return {
+    success: true,
+    message: `${file.name} uploaded successfully.`,
+    fileName: file.name,
+    fileUrl: uploadResult.publicUrl,
+  };
+}
+
+export async function uploadListingImagesInlineAction(formData: FormData) {
+  await requireAdminSession();
+
+  const supabase = createSupabaseAdminClient();
+  const listingId = String(formData.get("listingId") || "");
+  const files = formData
+    .getAll("images")
+    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+
+  if (!listingId) {
+    return {
+      success: false,
+      message: "Car file was not found.",
+    };
+  }
+
+  if (!files.length) {
+    return {
+      success: false,
+      message: "Please choose at least one photo.",
+    };
+  }
+
+  if (!supabase) {
+    return {
+      success: false,
+      message: "Supabase admin connection is missing.",
+    };
+  }
+
+  const { data: existingImages } = await supabase
+    .from("listing_images")
+    .select("id,sort_order,image_url")
+    .eq("listing_id", listingId)
+    .order("sort_order", { ascending: true });
+
+  let nextSortOrder = existingImages?.length ?? 0;
+
+  const { data: listing } = await supabase
+    .from("listings")
+    .select("cover_image_url")
+    .eq("id", listingId)
+    .maybeSingle();
+
+  let coverImageUrl = listing?.cover_image_url ?? null;
+  let uploadedCount = 0;
+
+  for (const file of files) {
+    if (!file.type.startsWith("image/")) {
+      continue;
+    }
+
+    const extension = file.name.split(".").pop() || "jpg";
+    const path = `${listingId}/${Date.now()}-${randomUUID()}.${extension}`;
+    const uploadResult = await uploadFileWithResult("listing-photos", path, file);
+
+    if (!uploadResult.publicUrl) {
+      continue;
+    }
+
+    await supabase.from("listing_images").insert({
+      listing_id: listingId,
+      image_url: uploadResult.publicUrl,
+      sort_order: nextSortOrder,
+    });
+
+    if (!coverImageUrl) {
+      coverImageUrl = uploadResult.publicUrl;
+    }
+
+    nextSortOrder += 1;
+    uploadedCount += 1;
+  }
+
+  if (!uploadedCount) {
+    return {
+      success: false,
+      message: "Photo upload failed. Please try again.",
+    };
+  }
+
+  await supabase
+    .from("listings")
+    .update({
+      cover_image_url: coverImageUrl,
+    })
+    .eq("id", listingId);
+
+  await revalidateAdminFilePaths(listingId);
+
+  return {
+    success: true,
+    message: `${uploadedCount} photo${uploadedCount > 1 ? "s" : ""} uploaded successfully.`,
+  };
 }
 
 export async function removeDocumentAction(formData: FormData) {
