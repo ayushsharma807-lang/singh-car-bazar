@@ -65,6 +65,12 @@ type BuyerDraft = {
   soldPrice: string;
 };
 
+const carDocumentGroups = [
+  { label: "RC", docType: "rc", emptyText: "No RC uploaded yet" },
+  { label: "Insurance", docType: "insurance", emptyText: "No insurance uploaded yet" },
+  { label: "Other papers", docType: "other", emptyText: "No other papers uploaded yet" },
+] as const;
+
 function getFileName(url: string) {
   try {
     const pathname = new URL(url).pathname;
@@ -572,9 +578,11 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
   const [sellerDocs, setSellerDocs] = useState<ListingDocument[]>(
     getDocumentsByType(file.listing.documents, "seller_id"),
   );
-  const [carDocs, setCarDocs] = useState<ListingDocument[]>(
-    getDocumentsByType(file.listing.documents, "other"),
-  );
+  const [carDocs, setCarDocs] = useState<Record<string, ListingDocument[]>>({
+    rc: getDocumentsByType(file.listing.documents, "rc"),
+    insurance: getDocumentsByType(file.listing.documents, "insurance"),
+    other: getDocumentsByType(file.listing.documents, "other"),
+  });
   const [buyerDocs, setBuyerDocs] = useState<ListingDocument[]>(
     getDocumentsByType(file.listing.documents, "buyer_id"),
   );
@@ -882,53 +890,82 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                 <div>
                   <p className="text-sm font-semibold text-black">Car documents</p>
                   <p className="text-sm text-gray-600">
-                    {carDocs.length
-                      ? `${carDocs.length} file${carDocs.length > 1 ? "s" : ""} uploaded`
+                    {Object.values(carDocs).flat().length
+                      ? `${Object.values(carDocs).flat().length} file${Object.values(carDocs).flat().length > 1 ? "s" : ""} uploaded`
                       : "No car docs uploaded yet"}
                   </p>
                 </div>
-                <UploadPicker
-                  action={uploadDocumentInlineAction}
-                  listingId={file.id}
-                  buttonLabel="Upload Car Docs"
-                  inputName="file"
-                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx"
-                  extraFields={[{ name: "docType", value: "other" }]}
-                  onSuccess={(result) => {
-                    if (result.success && result.documentId && result.fileUrl) {
-                      setCarDocs((current) => [
-                        ...current,
-                        {
-                          id: result.documentId!,
-                          listingId: file.id,
-                          docType: result.docType || "other",
-                          fileUrl: result.fileUrl!,
-                          notes: result.notes || null,
-                        },
-                      ]);
-                    }
-                  }}
-                />
               </div>
 
-              {carDocs.length ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {carDocs.map((document) => (
-                    <SellerDocCard
-                      key={document.id}
-                      document={document}
-                      listingId={file.id}
-                      onRemove={(documentId) =>
-                        setCarDocs((current) => current.filter((entry) => entry.id !== documentId))
-                      }
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-sm text-gray-600">
-                  No car docs uploaded yet
-                </div>
-              )}
+              <div className="grid gap-4">
+                {carDocumentGroups.map((group) => {
+                  const documents = carDocs[group.docType] ?? [];
+
+                  return (
+                    <div key={group.docType} className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-black">{group.label}</p>
+                          <p className="text-sm text-gray-600">
+                            {documents.length
+                              ? `${documents.length} file${documents.length > 1 ? "s" : ""} uploaded`
+                              : group.emptyText}
+                          </p>
+                        </div>
+                        <UploadPicker
+                          action={uploadDocumentInlineAction}
+                          listingId={file.id}
+                          buttonLabel={`Upload ${group.label}`}
+                          inputName="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx"
+                          extraFields={[{ name: "docType", value: group.docType }]}
+                          onSuccess={(result) => {
+                            if (result.success && result.documentId && result.fileUrl) {
+                              setCarDocs((current) => ({
+                                ...current,
+                                [group.docType]: [
+                                  ...(current[group.docType] ?? []),
+                                  {
+                                    id: result.documentId!,
+                                    listingId: file.id,
+                                    docType: result.docType || group.docType,
+                                    fileUrl: result.fileUrl!,
+                                    notes: result.notes || null,
+                                  },
+                                ],
+                              }));
+                            }
+                          }}
+                        />
+                      </div>
+
+                      {documents.length ? (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {documents.map((document) => (
+                            <SellerDocCard
+                              key={document.id}
+                              document={document}
+                              listingId={file.id}
+                              onRemove={(documentId) =>
+                                setCarDocs((current) => ({
+                                  ...current,
+                                  [group.docType]: (current[group.docType] ?? []).filter(
+                                    (entry) => entry.id !== documentId,
+                                  ),
+                                }))
+                              }
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-gray-600">
+                          {group.emptyText}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
