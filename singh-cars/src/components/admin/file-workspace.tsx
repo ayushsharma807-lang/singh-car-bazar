@@ -368,35 +368,111 @@ function FileCard({
   title: string;
   url: string;
   isImage: boolean;
-  onRemove: () => void;
+  onRemove: () => Promise<void> | void;
 }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-      {isImage ? (
-        <a href={url} target="_blank" rel="noreferrer" className="block">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt={title} className="h-28 w-full object-cover" />
-        </a>
-      ) : (
-        <div className="flex h-28 items-center justify-center bg-gray-50 text-gray-500">
-          <FileText className="h-8 w-8" />
-        </div>
-      )}
-      <div className="grid gap-3 p-4">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-black">{title}</p>
-          <p className="mt-1 text-xs text-gray-500">{isImage ? "Image file" : "Document file"}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <a href={url} target="_blank" rel="noreferrer" className="admin-btn admin-btn-sm">
-            Open
-          </a>
-          <button type="button" className="admin-btn admin-btn-sm" onClick={onRemove}>
-            Remove
+    <>
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        {isImage ? (
+          <button
+            type="button"
+            className="block w-full"
+            onClick={() => setPreviewOpen(true)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt={title} className="h-28 w-full object-cover" />
           </button>
+        ) : (
+          <div className="flex h-28 items-center justify-center bg-gray-50 text-gray-500">
+            <FileText className="h-8 w-8" />
+          </div>
+        )}
+        <div className="grid gap-3 p-4">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-black">{title}</p>
+            <p className="mt-1 text-xs text-gray-500">{isImage ? "Image file" : "Document file"}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a href={url} target="_blank" rel="noreferrer" className="admin-btn admin-btn-sm">
+              Open
+            </a>
+            <button
+              type="button"
+              className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isRemoving}
+              onClick={() => setConfirmOpen(true)}
+            >
+              {isRemoving ? "Removing..." : "Remove"}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      {confirmOpen ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-semibold text-black">Remove File?</h3>
+            <p className="mt-3 text-sm leading-6 text-gray-600">
+              Are you sure you want to remove this document?
+            </p>
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                className="admin-btn h-11 px-4"
+                disabled={isRemoving}
+                onClick={() => setConfirmOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isRemoving}
+                onClick={async () => {
+                  setIsRemoving(true);
+                  await onRemove();
+                  setIsRemoving(false);
+                  setConfirmOpen(false);
+                }}
+              >
+                {isRemoving ? "Removing..." : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {previewOpen && isImage ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4">
+          <button
+            type="button"
+            className="absolute inset-0"
+            onClick={() => setPreviewOpen(false)}
+            aria-label="Close preview"
+          />
+          <div className="relative z-10 w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <p className="truncate text-sm font-semibold text-black">{title}</p>
+              <button
+                type="button"
+                className="admin-btn admin-btn-sm"
+                onClick={() => setPreviewOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="bg-black">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt={title} className="max-h-[80vh] w-full object-contain" />
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
