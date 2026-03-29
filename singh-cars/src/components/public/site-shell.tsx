@@ -44,14 +44,22 @@ export function SiteShell({
                 <Link
                   key={item.label}
                   href={item.href}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "rounded-full border px-4 py-2 text-sm font-semibold uppercase tracking-[0.18em] transition",
+                    "group shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold uppercase tracking-[0.18em] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/15",
                     isActive
-                      ? "border-slate-950 bg-slate-950 text-white"
-                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950",
+                      ? "border-slate-950 bg-slate-950 text-white shadow-sm hover:bg-slate-900 hover:text-white focus-visible:text-white visited:text-white"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950 visited:text-slate-700",
                   )}
                 >
-                  {item.label}
+                  <span
+                    className={cn(
+                      "block",
+                      isActive ? "text-white" : "text-slate-700 group-hover:text-slate-950",
+                    )}
+                  >
+                    {item.label}
+                  </span>
                 </Link>
               );
             })}
