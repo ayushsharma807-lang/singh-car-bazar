@@ -13,11 +13,11 @@ import {
   Star,
 } from "lucide-react";
 import type { AdminFileRecord, ListingDocument, ListingImage } from "@/types";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
   removeDocumentByIdAction,
   removeListingImageByIdAction,
   setListingCoverImageAction,
-  uploadDocumentInlineAction,
   updateBuyerInfoAction,
   updateCarInfoAction,
   updateSellerInfoAction,
@@ -42,6 +42,14 @@ type RemoveResult = {
   documentId?: string;
   imageId?: string;
   imageUrl?: string;
+};
+
+type UploadQueueItem = {
+  id: string;
+  name: string;
+  status: "queued" | "uploading" | "success" | "error";
+  message: string;
+  file?: File;
 };
 
 type SellerDraft = {
@@ -72,6 +80,11 @@ const carDocumentGroups = [
   { label: "Insurance", docType: "insurance", emptyText: "No insurance uploaded yet" },
   { label: "Other papers", docType: "other", emptyText: "No other papers uploaded yet" },
 ] as const;
+
+const PHOTO_MAX_BYTES = 15 * 1024 * 1024;
+const DOCUMENT_MAX_BYTES = 12 * 1024 * 1024;
+const PHOTO_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"];
+const DOCUMENT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx"];
 
 function getFileName(url: string) {
   try {
@@ -154,28 +167,420 @@ function isImageDocument(document: ListingDocument) {
   return isImageName(meta.fileName, meta.mimeType);
 }
 
+function sanitizeFileName(name: string) {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "-");
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) {
+    return `${Math.round(bytes / 1024)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getFriendlyUploadError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  const lower = message.toLowerCase();
+
+  if (lower.includes("row-level security") || lower.includes("permission")) {
+    return "Storage permission error. Please sign in again and retry.";
+  }
+
+  if (lower.includes("network")) {
+    return "Network failed. Please check your connection and retry.";
+  }
+
+  if (lower.includes("timeout")) {
+    return "Upload timed out. Please retry.";
+  }
+
+  if (lower.includes("payload") || lower.includes("too large")) {
+    return "File is too large. Please choose a smaller file.";
+  }
+
+  if (lower.includes("mime") || lower.includes("format") || lower.includes("type")) {
+    return "Unsupported format. Please choose a supported file.";
+  }
+
+  return message || "Upload failed. Please try again.";
+}
+
+function updateQueueItem(
+  items: UploadQueueItem[],
+  id: string,
+  patch: Partial<UploadQueueItem>,
+) {
+  return items.map((item) => (item.id === id ? { ...item, ...patch } : item));
+}
+
+async function loadImageFromFile(file: File) {
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new window.Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Image could not be read."));
+      img.src = objectUrl;
+    });
+
+    return image;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function compressCarPhoto(file: File) {
+  const canCompress = ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(
+    file.type.toLowerCase(),
+  );
+
+  if (!canCompress) {
+    return file;
+  }
+
+  try {
+    const image = await loadImageFromFile(file);
+    const maxWidth = 1600;
+    const scale = Math.min(1, maxWidth / image.width);
+    const targetWidth = Math.max(1, Math.round(image.width * scale));
+    const targetHeight = Math.max(1, Math.round(image.height * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      return file;
+    }
+
+    context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", 0.82);
+    });
+
+    if (!blob || blob.size >= file.size) {
+      return file;
+    }
+
+    const nextName = file.name.replace(/\.[^.]+$/, "") || "photo";
+
+    return new File([blob], `${nextName}.jpg`, {
+      type: "image/jpeg",
+      lastModified: Date.now(),
+    });
+  } catch (error) {
+    console.error("Photo compression failed", error);
+    return file;
+  }
+}
+
 function UploadPicker({
-  action,
   listingId,
   buttonLabel,
-  inputName,
+  docType,
   accept,
-  multiple = false,
-  extraFields,
   onSuccess,
 }: {
-  action: (formData: FormData) => Promise<UploadResult>;
   listingId: string;
   buttonLabel: string;
-  inputName: string;
+  docType: string;
   accept?: string;
-  multiple?: boolean;
-  extraFields?: { name: string; value: string }[];
   onSuccess?: (result: UploadResult) => void;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [queue, setQueue] = useState<UploadQueueItem[]>([]);
+  const [feedback, setFeedback] = useState<{
+    tone: "idle" | "success" | "error";
+    message: string;
+  }>({
+    tone: "idle",
+    message: "",
+  });
+
+  return (
+    <div className="grid gap-2">
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(event) => {
+          const files = Array.from(event.currentTarget.files ?? []);
+          const file = files[0];
+
+          if (!file) {
+            return;
+          }
+
+          const lowerName = file.name.toLowerCase();
+          const hasAcceptedExtension = DOCUMENT_EXTENSIONS.some((extension) =>
+            lowerName.endsWith(extension),
+          );
+
+          if (!hasAcceptedExtension) {
+            setFeedback({
+              tone: "error",
+              message: "Unsupported format. Use PDF, JPG, PNG, DOC, or DOCX.",
+            });
+            event.currentTarget.value = "";
+            return;
+          }
+
+          if (file.size > DOCUMENT_MAX_BYTES) {
+            setFeedback({
+              tone: "error",
+              message: `File too large. Limit is ${formatFileSize(DOCUMENT_MAX_BYTES)}.`,
+            });
+            event.currentTarget.value = "";
+            return;
+          }
+
+          const uploadId = crypto.randomUUID();
+          setQueue((current) => [
+            {
+              id: uploadId,
+              name: file.name,
+              status: "queued",
+              message: "Waiting to upload",
+              file,
+            },
+            ...current.slice(0, 4),
+          ]);
+
+          setFeedback({
+            tone: "idle",
+            message: `Uploading ${file.name}...`,
+          });
+
+          startTransition(async () => {
+            const supabase = createBrowserSupabaseClient();
+
+            if (!supabase) {
+              setFeedback({
+                tone: "error",
+                message: "Supabase browser connection is missing.",
+              });
+              setQueue((current) =>
+                updateQueueItem(current, uploadId, {
+                  status: "error",
+                  message: "Supabase browser connection is missing.",
+                }),
+              );
+              return;
+            }
+
+            try {
+              setQueue((current) =>
+                updateQueueItem(current, uploadId, {
+                  status: "uploading",
+                  message: "Uploading...",
+                }),
+              );
+
+              const safeName = sanitizeFileName(file.name);
+              const folder =
+                docType === "seller_id"
+                  ? "seller-docs"
+                  : docType === "buyer_id"
+                    ? "buyer-docs"
+                    : "car-docs";
+              const path = `${folder}/${listingId}/${Date.now()}-${safeName}`;
+
+              const { error: uploadError } = await supabase.storage
+                .from("documents")
+                .upload(path, file, {
+                  contentType: file.type || "application/octet-stream",
+                  upsert: false,
+                });
+
+              if (uploadError) {
+                console.error("Document upload error", {
+                  listingId,
+                  docType,
+                  path,
+                  uploadError,
+                });
+                setFeedback({
+                  tone: "error",
+                  message: getFriendlyUploadError(uploadError),
+                });
+                setQueue((current) =>
+                  updateQueueItem(current, uploadId, {
+                    status: "error",
+                    message: getFriendlyUploadError(uploadError),
+                  }),
+                );
+                return;
+              }
+
+              const { data: publicData } = supabase.storage.from("documents").getPublicUrl(path);
+              const notePayload = JSON.stringify({
+                originalName: file.name,
+                mimeType: file.type || null,
+              });
+
+              const { data: insertedDocument, error: insertError } = await supabase
+                .from("documents")
+                .insert({
+                  listing_id: listingId,
+                  doc_type: docType,
+                  file_url: publicData.publicUrl,
+                  notes: notePayload,
+                })
+                .select("id,listing_id,doc_type,file_url,notes")
+                .single();
+
+              if (insertError || !insertedDocument) {
+                console.error("Document database insert error", {
+                  listingId,
+                  docType,
+                  insertError,
+                });
+                setFeedback({
+                  tone: "error",
+                  message: getFriendlyUploadError(insertError),
+                });
+                setQueue((current) =>
+                  updateQueueItem(current, uploadId, {
+                    status: "error",
+                    message: getFriendlyUploadError(insertError),
+                  }),
+                );
+                return;
+              }
+
+              const result: UploadResult = {
+                success: true,
+                message: `${file.name} uploaded successfully.`,
+                documentId: insertedDocument.id,
+                fileName: file.name,
+                fileUrl: insertedDocument.file_url,
+                docType: insertedDocument.doc_type,
+                notes: insertedDocument.notes || undefined,
+              };
+
+              setFeedback({
+                tone: "success",
+                message: result.message,
+              });
+              setQueue((current) =>
+                updateQueueItem(current, uploadId, {
+                  status: "success",
+                  message: "Uploaded",
+                }),
+              );
+              onSuccess?.(result);
+              window.setTimeout(() => {
+                router.refresh();
+              }, 500);
+            } catch (error) {
+              console.error("Document upload failed", {
+                listingId,
+                docType,
+                error,
+              });
+              const message = getFriendlyUploadError(error);
+              setFeedback({
+                tone: "error",
+                message,
+              });
+              setQueue((current) =>
+                updateQueueItem(current, uploadId, {
+                  status: "error",
+                  message,
+                }),
+              );
+            }
+          });
+
+          event.currentTarget.value = "";
+        }}
+      />
+      <button
+        type="button"
+        className="admin-btn h-12 px-4 text-sm"
+        disabled={isPending}
+        onClick={() => inputRef.current?.click()}
+      >
+        {isPending ? "Uploading..." : buttonLabel}
+      </button>
+      {feedback.message ? (
+        <p
+          className={`text-sm ${
+            feedback.tone === "error"
+              ? "text-red-600"
+              : feedback.tone === "success"
+                ? "text-green-700"
+                : "text-gray-500"
+          }`}
+        >
+          {feedback.message}
+        </p>
+      ) : null}
+      {queue.length ? (
+        <div className="grid gap-2">
+          {queue.map((item) => (
+            <div
+              key={item.id}
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="truncate font-medium text-black">{item.name}</span>
+                <span
+                  className={`font-semibold ${
+                    item.status === "error"
+                      ? "text-red-600"
+                      : item.status === "success"
+                        ? "text-green-700"
+                        : "text-gray-500"
+                  }`}
+                >
+                  {item.status === "uploading"
+                    ? "Uploading..."
+                    : item.status === "success"
+                      ? "Done"
+                      : item.status === "error"
+                        ? "Failed"
+                        : "Waiting"}
+                </span>
+              </div>
+              <p className="mt-1 text-gray-500">{item.message}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ApiUploadPicker({
+  listingId,
+  buttonLabel,
+  accept,
+  multiple = false,
+  currentPhotoCount,
+  currentCoverImageUrl,
+  onSuccess,
+}: {
+  listingId: string;
+  buttonLabel: string;
+  accept?: string;
+  multiple?: boolean;
+  currentPhotoCount: number;
+  currentCoverImageUrl?: string;
+  onSuccess?: (result: UploadResult) => void;
+}) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [queue, setQueue] = useState<UploadQueueItem[]>([]);
   const [feedback, setFeedback] = useState<{
     tone: "idle" | "success" | "error";
     message: string;
@@ -199,57 +604,229 @@ function UploadPicker({
             return;
           }
 
-          const uploadFormData = new FormData();
-          uploadFormData.set("listingId", listingId);
-          extraFields?.forEach((field) => {
-            uploadFormData.set(field.name, field.value);
+          const queuedItems = files.map((file) => ({
+            id: crypto.randomUUID(),
+            name: file.name,
+            status: "queued" as const,
+            message: "Waiting to upload",
+            file,
+          }));
+
+          setQueue((current) => [...queuedItems, ...current].slice(0, 12));
+
+          const invalidFile = files.find((file) => {
+            const lowerName = file.name.toLowerCase();
+            const validExtension = PHOTO_EXTENSIONS.some((extension) =>
+              lowerName.endsWith(extension),
+            );
+            return !validExtension || file.size > PHOTO_MAX_BYTES;
           });
 
-          if (multiple) {
-            for (const file of files) {
-              uploadFormData.append(inputName, file);
-            }
-          } else {
-            uploadFormData.set(inputName, files[0]);
+          if (invalidFile) {
+            const lowerName = invalidFile.name.toLowerCase();
+            const validExtension = PHOTO_EXTENSIONS.some((extension) =>
+              lowerName.endsWith(extension),
+            );
+            const message = !validExtension
+              ? "Unsupported format. Use JPG, PNG, WEBP, or HEIC."
+              : `File too large. Limit is ${formatFileSize(PHOTO_MAX_BYTES)}.`;
+
+            setFeedback({
+              tone: "error",
+              message,
+            });
+            setQueue((current) =>
+              current.map((item) =>
+                item.name === invalidFile.name
+                  ? { ...item, status: "error", message }
+                  : item,
+              ),
+            );
+            event.currentTarget.value = "";
+            return;
           }
 
           setFeedback({
             tone: "idle",
             message:
               files.length > 1
-                ? `Uploading ${files.length} files...`
-                : `Uploading ${files[0]?.name || "file"}...`,
+                ? `Uploading 1 of ${files.length}...`
+                : `Uploading ${files[0]?.name || "photo"}...`,
           });
 
           startTransition(async () => {
-            try {
-              const result = await action(uploadFormData);
+            const supabase = createBrowserSupabaseClient();
 
-              if (result.success) {
-                setFeedback({
-                  tone: "success",
-                  message: result.message,
-                });
-                onSuccess?.(result);
-
-                if (!onSuccess) {
-                  window.setTimeout(() => {
-                    router.refresh();
-                  }, 700);
-                }
-              } else {
-                setFeedback({
-                  tone: "error",
-                  message: result.message,
-                });
-              }
-            } catch (error) {
+            if (!supabase) {
               setFeedback({
                 tone: "error",
+                message: "Supabase browser connection is missing.",
+              });
+              setQueue((current) =>
+                current.map((item) => ({
+                  ...item,
+                  status: "error",
+                  message: "Supabase browser connection is missing.",
+                })),
+              );
+              return;
+            }
+
+            try {
+              const uploadedImages: ListingImage[] = [];
+              let failedCount = 0;
+              let nextSortOrder = currentPhotoCount;
+              let nextCoverImageUrl = currentCoverImageUrl || "";
+
+              for (const [index, queueItem] of queuedItems.entries()) {
+                const file = queueItem.file;
+
+                if (!file) {
+                  continue;
+                }
+
+                setFeedback({
+                  tone: "idle",
+                  message: `Uploading ${index + 1} of ${queuedItems.length}...`,
+                });
+
+                setQueue((current) =>
+                  updateQueueItem(current, queueItem.id, {
+                    status: "uploading",
+                    message: "Compressing and uploading...",
+                  }),
+                );
+
+                const compressedFile = await compressCarPhoto(file);
+                const safeName = sanitizeFileName(compressedFile.name);
+                const path = `car-photos/${listingId}/${Date.now()}-${safeName}`;
+
+                const { error: uploadError } = await supabase.storage
+                  .from("listing-photos")
+                  .upload(path, compressedFile, {
+                    contentType: compressedFile.type || "image/jpeg",
+                    upsert: false,
+                  });
+
+                if (uploadError) {
+                  console.error("Car photo upload error", {
+                    listingId,
+                    fileName: file.name,
+                    uploadError,
+                  });
+                  const message = getFriendlyUploadError(uploadError);
+                  setQueue((current) =>
+                    updateQueueItem(current, queueItem.id, {
+                      status: "error",
+                      message,
+                    }),
+                  );
+                  failedCount += 1;
+                  continue;
+                }
+
+                const { data: publicData } = supabase.storage
+                  .from("listing-photos")
+                  .getPublicUrl(path);
+
+                const { data: insertedImage, error: insertError } = await supabase
+                  .from("listing_images")
+                  .insert({
+                    listing_id: listingId,
+                    image_url: publicData.publicUrl,
+                    sort_order: nextSortOrder,
+                  })
+                  .select("id,listing_id,image_url,sort_order")
+                  .single();
+
+                if (insertError || !insertedImage) {
+                  console.error("Car photo database insert error", {
+                    listingId,
+                    fileName: file.name,
+                    insertError,
+                  });
+                  const message = getFriendlyUploadError(insertError);
+                  setQueue((current) =>
+                    updateQueueItem(current, queueItem.id, {
+                      status: "error",
+                      message,
+                    }),
+                  );
+                  failedCount += 1;
+                  continue;
+                }
+
+                if (!nextCoverImageUrl) {
+                  const { error: coverError } = await supabase
+                    .from("listings")
+                    .update({
+                      cover_image_url: insertedImage.image_url,
+                    })
+                    .eq("id", listingId);
+
+                  if (coverError) {
+                    console.error("Cover image update error", {
+                      listingId,
+                      fileName: file.name,
+                      coverError,
+                    });
+                  } else {
+                    nextCoverImageUrl = insertedImage.image_url;
+                  }
+                }
+
+                uploadedImages.push({
+                  id: insertedImage.id,
+                  listingId: insertedImage.listing_id,
+                  imageUrl: insertedImage.image_url,
+                  sortOrder: insertedImage.sort_order,
+                });
+
+                nextSortOrder += 1;
+                setQueue((current) =>
+                  updateQueueItem(current, queueItem.id, {
+                    status: "success",
+                    message:
+                      compressedFile.size < file.size
+                        ? `Uploaded (${formatFileSize(file.size)} -> ${formatFileSize(compressedFile.size)})`
+                        : "Uploaded",
+                  }),
+                );
+              }
+
+              if (!uploadedImages.length) {
+                setFeedback({
+                  tone: "error",
+                  message: "No photo was uploaded. Please retry with a smaller supported image.",
+                });
+                return;
+              }
+
+              const result: UploadResult = {
+                success: true,
                 message:
-                  error instanceof Error
-                    ? error.message
-                    : "Upload failed. Please try again.",
+                  failedCount > 0
+                    ? `${uploadedImages.length} uploaded, ${failedCount} failed.`
+                    : `${uploadedImages.length} photo${uploadedImages.length > 1 ? "s" : ""} uploaded successfully.`,
+                images: uploadedImages,
+              };
+
+              setFeedback({
+                tone: failedCount > 0 ? "error" : "success",
+                message: result.message,
+              });
+              onSuccess?.(result);
+              window.setTimeout(() => {
+                router.refresh();
+              }, 500);
+            } catch (error) {
+              console.error("Car photo upload failed", {
+                listingId,
+                error,
+              });
+              setFeedback({
+                tone: "error",
+                message: getFriendlyUploadError(error),
               });
             }
           });
@@ -278,133 +855,37 @@ function UploadPicker({
           {feedback.message}
         </p>
       ) : null}
-    </div>
-  );
-}
-
-function ApiUploadPicker({
-  url,
-  listingId,
-  buttonLabel,
-  inputName,
-  accept,
-  multiple = false,
-  onSuccess,
-}: {
-  url: string;
-  listingId: string;
-  buttonLabel: string;
-  inputName: string;
-  accept?: string;
-  multiple?: boolean;
-  onSuccess?: (result: UploadResult) => void;
-}) {
-  const router = useRouter();
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const [feedback, setFeedback] = useState<{
-    tone: "idle" | "success" | "error";
-    message: string;
-  }>({
-    tone: "idle",
-    message: "",
-  });
-
-  return (
-    <div className="grid gap-2">
-      <input
-        ref={inputRef}
-        type="file"
-        accept={accept}
-        multiple={multiple}
-        className="hidden"
-        onChange={(event) => {
-          const files = Array.from(event.currentTarget.files ?? []);
-
-          if (!files.length) {
-            return;
-          }
-
-          const uploadFormData = new FormData();
-          uploadFormData.set("listingId", listingId);
-
-          if (multiple) {
-            for (const file of files) {
-              uploadFormData.append(inputName, file);
-            }
-          } else {
-            uploadFormData.set(inputName, files[0]);
-          }
-
-          setFeedback({
-            tone: "idle",
-            message:
-              files.length > 1
-                ? `Uploading ${files.length} files...`
-                : `Uploading ${files[0]?.name || "file"}...`,
-          });
-
-          startTransition(async () => {
-            try {
-              const response = await fetch(url, {
-                method: "POST",
-                body: uploadFormData,
-              });
-
-              const result = (await response.json()) as UploadResult;
-
-              if (response.ok && result.success) {
-                setFeedback({
-                  tone: "success",
-                  message: result.message,
-                });
-                onSuccess?.(result);
-
-                if (!onSuccess) {
-                  window.setTimeout(() => {
-                    router.refresh();
-                  }, 700);
-                }
-              } else {
-                setFeedback({
-                  tone: "error",
-                  message: result.message || "Upload failed. Please try again.",
-                });
-              }
-            } catch (error) {
-              setFeedback({
-                tone: "error",
-                message:
-                  error instanceof Error
-                    ? error.message
-                    : "Upload failed. Please try again.",
-              });
-            }
-          });
-
-          event.currentTarget.value = "";
-        }}
-      />
-      <button
-        type="button"
-        className="admin-btn h-12 px-4 text-sm"
-        disabled={isPending}
-        onClick={() => inputRef.current?.click()}
-      >
-        {isPending ? "Uploading..." : buttonLabel}
-      </button>
-      {feedback.message ? (
-        <p
-          className={`text-sm ${
-            feedback.tone === "error"
-              ? "text-red-600"
-              : feedback.tone === "success"
-                ? "text-green-700"
-                : "text-gray-500"
-          }`}
-        >
-          {feedback.message}
-        </p>
+      {queue.length ? (
+        <div className="grid gap-2">
+          {queue.map((item) => (
+            <div
+              key={item.id}
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="truncate font-medium text-black">{item.name}</span>
+                <span
+                  className={`font-semibold ${
+                    item.status === "error"
+                      ? "text-red-600"
+                      : item.status === "success"
+                        ? "text-green-700"
+                        : "text-gray-500"
+                  }`}
+                >
+                  {item.status === "uploading"
+                    ? "Uploading..."
+                    : item.status === "success"
+                      ? "Done"
+                      : item.status === "error"
+                        ? "Failed"
+                        : "Waiting"}
+                </span>
+              </div>
+              <p className="mt-1 text-gray-500">{item.message}</p>
+            </div>
+          ))}
+        </div>
       ) : null}
     </div>
   );
@@ -897,14 +1378,12 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                     : "No seller docs uploaded yet"}
                 </p>
               </div>
-              <UploadPicker
-                action={uploadDocumentInlineAction}
-                listingId={file.id}
-                buttonLabel="Upload Seller Docs"
-                inputName="file"
-                accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx"
-                extraFields={[{ name: "docType", value: "seller_id" }]}
-                onSuccess={(result) => {
+                <UploadPicker
+                  listingId={file.id}
+                  buttonLabel="Upload Seller Docs"
+                  docType="seller_id"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx"
+                  onSuccess={(result) => {
                   if (result.success && result.documentId && result.fileUrl) {
                     setSellerDocs((current) => [
                       ...current,
@@ -1135,12 +1614,10 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                           </p>
                         </div>
                         <UploadPicker
-                          action={uploadDocumentInlineAction}
                           listingId={file.id}
                           buttonLabel={`Upload ${group.label}`}
-                          inputName="file"
+                          docType={group.docType}
                           accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx"
-                          extraFields={[{ name: "docType", value: group.docType }]}
                           onSuccess={(result) => {
                             if (result.success && result.documentId && result.fileUrl) {
                               setCarDocs((current) => ({
@@ -1201,12 +1678,12 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                   </p>
                 </div>
                 <ApiUploadPicker
-                  url="/api/admin/upload-listing-images"
                   listingId={file.id}
                   buttonLabel="Upload Car Photos"
-                  inputName="images"
                   accept=".jpg,.jpeg,.png,.webp,.heic"
                   multiple
+                  currentPhotoCount={carPhotos.length}
+                  currentCoverImageUrl={coverImageUrl}
                   onSuccess={(result) => {
                     if (result.success && result.images?.length) {
                       if (!coverImageUrl && result.images[0]?.imageUrl) {
@@ -1338,12 +1815,10 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                   </p>
                 </div>
                 <UploadPicker
-                  action={uploadDocumentInlineAction}
                   listingId={file.id}
                   buttonLabel="Upload Buyer Docs"
-                  inputName="file"
+                  docType="buyer_id"
                   accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx"
-                  extraFields={[{ name: "docType", value: "buyer_id" }]}
                   onSuccess={(result) => {
                     if (result.success && result.documentId && result.fileUrl) {
                       setBuyerDocs((current) => [
