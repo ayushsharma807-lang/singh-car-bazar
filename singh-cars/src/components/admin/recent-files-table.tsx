@@ -4,14 +4,24 @@ import { formatDateTime } from "@/lib/utils";
 import type { AdminFileRecord } from "@/types";
 import { StatusPill } from "@/components/admin/status-pill";
 
-export function RecentFilesTable({ files }: { files: AdminFileRecord[] }) {
+export function RecentFilesTable({
+  files,
+  highlightedFileId,
+}: {
+  files: AdminFileRecord[];
+  highlightedFileId?: string | null;
+}) {
   return (
     <div className="grid gap-3">
       {files.map((file) => (
         <Link
           key={file.id}
           href={`/admin/files/${file.id}`}
-          className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:bg-gray-50"
+          className={`block rounded-xl border bg-white p-4 shadow-sm transition hover:bg-gray-50 ${
+            highlightedFileId === file.id
+              ? "border-green-300 ring-2 ring-green-100"
+              : "border-gray-200"
+          }`}
         >
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>

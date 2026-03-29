@@ -265,6 +265,11 @@ async function redirectToAdminFile(listingId: string, saved?: "seller" | "car" |
   redirect(saved ? `/admin/files/${listingId}?saved=${saved}` : `/admin/files/${listingId}`);
 }
 
+async function redirectToAdminHome(listingId: string, saved: "car") {
+  await revalidateAdminFilePaths(listingId);
+  redirect(`/admin?saved=${saved}&file=${listingId}`);
+}
+
 export async function submitInquiryAction(
   _: InquiryActionState,
   formData: FormData,
@@ -567,8 +572,8 @@ export async function saveListingAction(
     }
   }
 
-  await revalidateAdminFilePaths(listingId);
-  redirect(`/admin/files/${listingId}`);
+  await redirectToAdminHome(listingId, "car");
+  return { status: "idle" };
 }
 
 export async function updateSellerInfoAction(formData: FormData) {
@@ -687,7 +692,7 @@ export async function updateCarInfoAction(formData: FormData) {
     throw new Error(`Car save failed: ${error.message}`);
   }
 
-  await redirectToAdminFile(listingId, "car");
+  return redirectToAdminHome(listingId, "car");
 }
 
 export async function markListingSoldAction(formData: FormData) {

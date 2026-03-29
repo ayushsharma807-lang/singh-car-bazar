@@ -4,7 +4,17 @@ import { AdminShell } from "@/components/admin/admin-shell";
 import { RecentFilesTable } from "@/components/admin/recent-files-table";
 import { getAdminSetupErrorMessage, getDashboardSummary } from "@/lib/data";
 
-export default async function AdminDashboardPage() {
+type AdminDashboardPageProps = {
+  searchParams: Promise<{
+    saved?: string;
+    file?: string;
+  }>;
+};
+
+export default async function AdminDashboardPage({
+  searchParams,
+}: AdminDashboardPageProps) {
+  const { saved, file: fileId } = await searchParams;
   let summary = null;
   let adminDataError: string | null = null;
 
@@ -26,8 +36,35 @@ export default async function AdminDashboardPage() {
     );
   }
 
+  const recentFiles = fileId
+    ? [...summary.recentFiles].sort((left, right) => {
+        if (left.id === fileId) {
+          return -1;
+        }
+
+        if (right.id === fileId) {
+          return 1;
+        }
+
+        return 0;
+      })
+    : summary.recentFiles;
+
   return (
     <AdminShell>
+      {saved === "car" ? (
+        <section className="mb-5 rounded-xl border border-green-200 bg-green-50 px-6 py-4 text-sm font-semibold text-green-800 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>Car saved successfully.</span>
+            {fileId ? (
+              <Link href={`/admin/files/${fileId}`} className="text-sm font-semibold text-green-900 underline underline-offset-4">
+                Open file
+              </Link>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
       <div className="grid gap-4 xl:grid-cols-5">
         <DashboardCard href="/admin/files" label="Total Files" value={summary.totalFiles} hint="All car files" />
         <DashboardCard href="/admin/files?status=available" label="Cars In Stock" value={summary.carsInStock} hint="Cars ready for sale" />
@@ -51,7 +88,7 @@ export default async function AdminDashboardPage() {
               View all <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <RecentFilesTable files={summary.recentFiles} />
+          <RecentFilesTable files={recentFiles} highlightedFileId={fileId ?? null} />
         </section>
       </div>
     </AdminShell>
