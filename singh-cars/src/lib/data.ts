@@ -272,7 +272,11 @@ async function fetchListingsFromSupabase({
     : await getPublicSupabase();
 
   if (!supabase) {
-    return admin ? [] : null;
+    if (admin) {
+      throw new Error("Supabase admin access is not configured.");
+    }
+
+    return null;
   }
 
   let query = supabase
@@ -320,7 +324,11 @@ async function fetchListingsFromSupabase({
   const { data, error } = await query;
 
   if (error || !data) {
-    return admin ? [] : null;
+    if (admin) {
+      throw new Error(error?.message || "Could not load admin listings.");
+    }
+
+    return null;
   }
 
   return data.map((row) => mapListing(row as ListingRow));
@@ -564,6 +572,14 @@ export async function getDashboardSummary(): Promise<DealerDashboardSummary> {
       )
       .slice(0, 6),
   };
+}
+
+export function getAdminSetupErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Admin data could not be loaded right now.";
 }
 
 export async function getInquiries(): Promise<Inquiry[]> {

@@ -49,7 +49,11 @@ export default async function CarDetailPage({ params }: CarDetailPageProps) {
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="grid gap-8 xl:grid-cols-[1.12fr_0.88fr]">
           <div>
-            <CarGallery images={listing.images} title={title} />
+            <CarGallery
+              images={listing.images}
+              coverImageUrl={listing.coverImageUrl}
+              title={title}
+            />
           </div>
 
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">

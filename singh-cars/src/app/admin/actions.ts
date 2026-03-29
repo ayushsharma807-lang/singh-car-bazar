@@ -6,11 +6,16 @@ import { redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
+export type InquiryActionState = {
+  status: "idle" | "success" | "error";
+  message?: string;
+};
+
 async function requireAdminSession() {
   const supabase = await createServerSupabaseClient();
 
   if (!supabase) {
-    return null;
+    redirect("/admin/login?reason=config");
   }
 
   const {
@@ -167,22 +172,43 @@ async function redirectToAdminFile(listingId: string) {
   redirect(`/admin/files/${listingId}`);
 }
 
-export async function submitInquiryAction(formData: FormData) {
+export async function submitInquiryAction(
+  _: InquiryActionState,
+  formData: FormData,
+): Promise<InquiryActionState> {
   const supabase = await createServerSupabaseClient();
 
-  if (supabase) {
-    await supabase.from("inquiries").insert({
-      listing_id: String(formData.get("listingId") || "") || null,
-      name: String(formData.get("name") || ""),
-      phone: String(formData.get("phone") || ""),
-      email: String(formData.get("email") || "") || null,
-      message: String(formData.get("message") || "") || null,
-    });
+  if (!supabase) {
+    return {
+      status: "error",
+      message: "Inquiry setup is not ready yet. Please call or WhatsApp us for now.",
+    };
+  }
+
+  const { error } = await supabase.from("inquiries").insert({
+    listing_id: String(formData.get("listingId") || "") || null,
+    name: String(formData.get("name") || ""),
+    phone: String(formData.get("phone") || ""),
+    email: String(formData.get("email") || "") || null,
+    message: String(formData.get("message") || "") || null,
+  });
+
+  if (error) {
+    console.error("Inquiry insert failed", error);
+    return {
+      status: "error",
+      message: "We could not send your inquiry. Please try again or contact us directly.",
+    };
   }
 
   revalidatePath("/");
   revalidatePath("/contact");
   revalidatePath("/inventory");
+
+  return {
+    status: "success",
+    message: "Inquiry sent successfully. We will contact you soon.",
+  };
 }
 
 export async function adminSignOutAction() {

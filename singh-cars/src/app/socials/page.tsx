@@ -16,23 +16,40 @@ export default function SocialsPage() {
         </p>
         <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {siteConfig.socials.map((social) => (
-            <a
-              key={social.label}
-              href={social.href}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(15,23,42,0.08)]"
-            >
-              <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[#2252e8]">
-                Social Channel
-              </p>
-              <h2 className="mt-4 font-display text-4xl uppercase tracking-[0.08em] text-slate-900">
-                {social.label}
-              </h2>
-              <p className="mt-4 text-base leading-7 text-slate-600">
-                Open our {social.label} page in a new tab.
-              </p>
-            </a>
+            social.href ? (
+              <a
+                key={social.label}
+                href={social.href}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(15,23,42,0.08)]"
+              >
+                <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[#2252e8]">
+                  Social Channel
+                </p>
+                <h2 className="mt-4 font-display text-4xl uppercase tracking-[0.08em] text-slate-900">
+                  {social.label}
+                </h2>
+                <p className="mt-4 text-base leading-7 text-slate-600">
+                  Open our {social.label} page in a new tab.
+                </p>
+              </a>
+            ) : (
+              <div
+                key={social.label}
+                className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-sm"
+              >
+                <p className="text-sm font-semibold uppercase tracking-[0.28em] text-slate-500">
+                  Social Channel
+                </p>
+                <h2 className="mt-4 font-display text-4xl uppercase tracking-[0.08em] text-slate-900">
+                  {social.label}
+                </h2>
+                <p className="mt-4 text-base leading-7 text-slate-600">
+                  This profile link has not been added yet.
+                </p>
+              </div>
+            )
           ))}
         </div>
       </section>

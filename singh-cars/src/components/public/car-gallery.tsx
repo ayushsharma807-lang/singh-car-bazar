@@ -9,15 +9,26 @@ type GalleryImage = {
 
 export function CarGallery({
   images,
+  coverImageUrl,
   title,
 }: {
   images: GalleryImage[];
+  coverImageUrl?: string | null;
   title: string;
 }) {
-  const validImages = useMemo(
-    () => images.filter((image) => image.imageUrl),
-    [images],
-  );
+  const validImages = useMemo(() => {
+    const filtered = images.filter((image) => image.imageUrl);
+
+    if (!filtered.length && coverImageUrl) {
+      return [{ id: "cover-image", imageUrl: coverImageUrl }];
+    }
+
+    if (coverImageUrl && !filtered.some((image) => image.imageUrl === coverImageUrl)) {
+      return [{ id: "cover-image", imageUrl: coverImageUrl }, ...filtered];
+    }
+
+    return filtered;
+  }, [coverImageUrl, images]);
   const [activeImageId, setActiveImageId] = useState(validImages[0]?.id ?? "");
   const activeImage =
     validImages.find((image) => image.id === activeImageId) ?? validImages[0];

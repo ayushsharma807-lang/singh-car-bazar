@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { getAdminFiles } from "@/lib/data";
+import { getAdminFiles, getAdminSetupErrorMessage } from "@/lib/data";
 import { StatusPill } from "@/components/admin/status-pill";
 
 type CompletedFilesPageProps = {
@@ -11,10 +11,29 @@ export default async function CompletedFilesPage({
   searchParams,
 }: CompletedFilesPageProps) {
   const params = await searchParams;
-  const files = await getAdminFiles({
-    query: params.query,
-    completed: "only",
-  });
+  let files = null;
+  let adminDataError: string | null = null;
+
+  try {
+    files = await getAdminFiles({
+      query: params.query,
+      completed: "only",
+    });
+  } catch (error) {
+    adminDataError = getAdminSetupErrorMessage(error);
+  }
+
+  if (!files) {
+    return (
+      <AdminShell>
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em]">Admin Setup Needed</p>
+          <h1 className="mt-2 text-2xl font-semibold">Completed files could not load</h1>
+          <p className="mt-3 text-sm">{adminDataError}</p>
+        </section>
+      </AdminShell>
+    );
+  }
 
   return (
     <AdminShell

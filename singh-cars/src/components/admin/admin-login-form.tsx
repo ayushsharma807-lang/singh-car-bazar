@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
-export function AdminLoginForm() {
+export function AdminLoginForm({ setupError }: { setupError?: string | null }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
@@ -43,6 +43,7 @@ export function AdminLoginForm() {
       <h1 className="text-3xl font-semibold text-black">
         Admin Login
       </h1>
+      {setupError ? <p className="text-sm text-amber-700">{setupError}</p> : null}
       <input className="field" type="email" name="email" placeholder="Admin email" required />
       <input className="field" type="password" name="password" placeholder="Password" required />
       {error ? <p className="text-sm text-red-600">{error}</p> : null}

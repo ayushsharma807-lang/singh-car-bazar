@@ -104,15 +104,24 @@ export function SiteShell({
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 {siteConfig.socials.map((social) => (
-                  <a
-                    key={social.label}
-                    href={social.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950"
-                  >
-                    {social.label}
-                  </a>
+                  social.href ? (
+                    <a
+                      key={social.label}
+                      href={social.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950"
+                    >
+                      {social.label}
+                    </a>
+                  ) : (
+                    <span
+                      key={social.label}
+                      className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold uppercase tracking-[0.18em] text-slate-400"
+                    >
+                      {social.label}
+                    </span>
+                  )
                 ))}
               </div>
             </div>

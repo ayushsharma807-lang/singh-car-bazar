@@ -2,10 +2,29 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { RecentFilesTable } from "@/components/admin/recent-files-table";
-import { getDashboardSummary } from "@/lib/data";
+import { getAdminSetupErrorMessage, getDashboardSummary } from "@/lib/data";
 
 export default async function AdminDashboardPage() {
-  const summary = await getDashboardSummary();
+  let summary = null;
+  let adminDataError: string | null = null;
+
+  try {
+    summary = await getDashboardSummary();
+  } catch (error) {
+    adminDataError = getAdminSetupErrorMessage(error);
+  }
+
+  if (!summary) {
+    return (
+      <AdminShell>
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em]">Admin Setup Needed</p>
+          <h1 className="mt-2 text-2xl font-semibold">Dashboard could not load</h1>
+          <p className="mt-3 text-sm">{adminDataError}</p>
+        </section>
+      </AdminShell>
+    );
+  }
 
   return (
     <AdminShell>

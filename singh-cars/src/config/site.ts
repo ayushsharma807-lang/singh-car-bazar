@@ -8,9 +8,9 @@ export const siteConfig = {
     "B.M.C. Chowk, Shop No. 3-4, Near Desh Bhagat Hall, 10 G.T. Road, Jalandhar",
   whatsappNumber: "917277131313",
   socials: [
-    { label: "Instagram", href: "https://www.instagram.com/" },
-    { label: "Facebook", href: "https://www.facebook.com/" },
-    { label: "YouTube", href: "https://www.youtube.com/" },
+    { label: "Instagram", href: null },
+    { label: "Facebook", href: null },
+    { label: "YouTube", href: null },
   ],
   navigation: [
     { label: "Home", href: "/" },

@@ -7,6 +7,7 @@ import {
   MobileBottomNav,
 } from "@/components/admin/admin-navigation";
 import { getDashboardSummary } from "@/lib/data";
+import type { DealerDashboardSummary } from "@/types";
 
 export async function AdminShell({
   children,
@@ -17,7 +18,22 @@ export async function AdminShell({
   searchAction?: string;
   searchPlaceholder?: string;
 }) {
-  const summary = await getDashboardSummary();
+  let summary: DealerDashboardSummary = {
+    totalFiles: 0,
+    carsInStock: 0,
+    soldCars: 0,
+    filesMissingBuyerDocuments: 0,
+    filesMissingSellerDocuments: 0,
+    completedFiles: 0,
+    recentFiles: [],
+  };
+  let adminDataError: string | null = null;
+
+  try {
+    summary = await getDashboardSummary();
+  } catch (error) {
+    adminDataError = error instanceof Error ? error.message : "Admin data could not be loaded.";
+  }
   const navItems = [
     { href: "/admin", label: "Home", icon: "home" as const },
     { href: "/admin/files", label: "Car Files", icon: "files" as const },
@@ -99,6 +115,11 @@ export async function AdminShell({
           </header>
 
           <main className="min-w-0 flex-1">{children}</main>
+          {adminDataError ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {adminDataError}
+            </div>
+          ) : null}
         </div>
       </div>
       <MobileBottomNav items={mobileNavItems} />

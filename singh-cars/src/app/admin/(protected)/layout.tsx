@@ -8,14 +8,16 @@ export default async function ProtectedAdminLayout({
 }>) {
   const supabase = await createServerSupabaseClient();
 
-  if (supabase) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  if (!supabase) {
+    redirect("/admin/login?reason=config");
+  }
 
-    if (!user) {
-      redirect("/admin/login");
-    }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/admin/login");
   }
 
   return children;
