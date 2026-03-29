@@ -364,12 +364,6 @@ export function ListingForm({ listing }: ListingFormProps) {
               >
                 {isEditing ? "Save Changes" : "Save Car"}
               </button>
-              <button
-                type="submit"
-                className="admin-btn"
-              >
-                {isEditing ? "Save and Close" : "Add Car"}
-              </button>
             </div>
           </div>
         </section>

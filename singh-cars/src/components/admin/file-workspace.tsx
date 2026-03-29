@@ -13,8 +13,9 @@ import {
   Star,
 } from "lucide-react";
 import type { AdminFileRecord, ListingDocument, ListingImage } from "@/types";
-import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
+  uploadDocumentInlineAction,
+  uploadListingImagesInlineAction,
   removeDocumentByIdAction,
   removeListingImageByIdAction,
   setListingCoverImageAction,
@@ -84,7 +85,17 @@ const carDocumentGroups = [
 const PHOTO_MAX_BYTES = 15 * 1024 * 1024;
 const DOCUMENT_MAX_BYTES = 12 * 1024 * 1024;
 const PHOTO_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"];
-const DOCUMENT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx"];
+const DOCUMENT_EXTENSIONS = [
+  ".pdf",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".heic",
+  ".heif",
+  ".doc",
+  ".docx",
+];
 
 function getFileName(url: string) {
   try {
@@ -165,10 +176,6 @@ function isImageName(name: string, mimeType = "") {
 function isImageDocument(document: ListingDocument) {
   const meta = getDocumentMeta(document);
   return isImageName(meta.fileName, meta.mimeType);
-}
-
-function sanitizeFileName(name: string) {
-  return name.replace(/[^a-zA-Z0-9._-]/g, "-");
 }
 
 function formatFileSize(bytes: number) {
@@ -327,7 +334,7 @@ function UploadPicker({
           if (!hasAcceptedExtension) {
             setFeedback({
               tone: "error",
-              message: "Unsupported format. Use PDF, JPG, PNG, DOC, or DOCX.",
+              message: "Unsupported format. Use PDF, JPG, PNG, WEBP, HEIC, DOC, or DOCX.",
             });
             event.currentTarget.value = "";
             return;
@@ -360,22 +367,6 @@ function UploadPicker({
           });
 
           startTransition(async () => {
-            const supabase = createBrowserSupabaseClient();
-
-            if (!supabase) {
-              setFeedback({
-                tone: "error",
-                message: "Supabase browser connection is missing.",
-              });
-              setQueue((current) =>
-                updateQueueItem(current, uploadId, {
-                  status: "error",
-                  message: "Supabase browser connection is missing.",
-                }),
-              );
-              return;
-            }
-
             try {
               setQueue((current) =>
                 updateQueueItem(current, uploadId, {
@@ -384,87 +375,26 @@ function UploadPicker({
                 }),
               );
 
-              const safeName = sanitizeFileName(file.name);
-              const folder =
-                docType === "seller_id"
-                  ? "seller-docs"
-                  : docType === "buyer_id"
-                    ? "buyer-docs"
-                    : "car-docs";
-              const path = `${folder}/${listingId}/${Date.now()}-${safeName}`;
+              const payload = new FormData();
+              payload.append("listingId", listingId);
+              payload.append("docType", docType);
+              payload.append("file", file);
+              const result = await uploadDocumentInlineAction(payload);
 
-              const { error: uploadError } = await supabase.storage
-                .from("documents")
-                .upload(path, file, {
-                  contentType: file.type || "application/octet-stream",
-                  upsert: false,
-                });
-
-              if (uploadError) {
-                console.error("Document upload error", {
-                  listingId,
-                  docType,
-                  path,
-                  uploadError,
-                });
+              if (!result.success || !result.documentId || !result.fileUrl) {
+                const message = result.message || "Document upload failed.";
                 setFeedback({
                   tone: "error",
-                  message: getFriendlyUploadError(uploadError),
+                  message,
                 });
                 setQueue((current) =>
                   updateQueueItem(current, uploadId, {
                     status: "error",
-                    message: getFriendlyUploadError(uploadError),
+                    message,
                   }),
                 );
                 return;
               }
-
-              const { data: publicData } = supabase.storage.from("documents").getPublicUrl(path);
-              const notePayload = JSON.stringify({
-                originalName: file.name,
-                mimeType: file.type || null,
-              });
-
-              const { data: insertedDocument, error: insertError } = await supabase
-                .from("documents")
-                .insert({
-                  listing_id: listingId,
-                  doc_type: docType,
-                  file_url: publicData.publicUrl,
-                  notes: notePayload,
-                })
-                .select("id,listing_id,doc_type,file_url,notes")
-                .single();
-
-              if (insertError || !insertedDocument) {
-                console.error("Document database insert error", {
-                  listingId,
-                  docType,
-                  insertError,
-                });
-                setFeedback({
-                  tone: "error",
-                  message: getFriendlyUploadError(insertError),
-                });
-                setQueue((current) =>
-                  updateQueueItem(current, uploadId, {
-                    status: "error",
-                    message: getFriendlyUploadError(insertError),
-                  }),
-                );
-                return;
-              }
-
-              const result: UploadResult = {
-                success: true,
-                message: `${file.name} uploaded successfully.`,
-                documentId: insertedDocument.id,
-                fileName: file.name,
-                fileUrl: insertedDocument.file_url,
-                docType: insertedDocument.doc_type,
-                notes: insertedDocument.notes || undefined,
-              };
 
               setFeedback({
                 tone: "success",
@@ -565,16 +495,12 @@ function ApiUploadPicker({
   buttonLabel,
   accept,
   multiple = false,
-  currentPhotoCount,
-  currentCoverImageUrl,
   onSuccess,
 }: {
   listingId: string;
   buttonLabel: string;
   accept?: string;
   multiple?: boolean;
-  currentPhotoCount: number;
-  currentCoverImageUrl?: string;
   onSuccess?: (result: UploadResult) => void;
 }) {
   const router = useRouter();
@@ -628,7 +554,7 @@ function ApiUploadPicker({
               lowerName.endsWith(extension),
             );
             const message = !validExtension
-              ? "Unsupported format. Use JPG, PNG, WEBP, or HEIC."
+              ? "Unsupported format. Use JPG, JPEG, PNG, WEBP, HEIC, or HEIF."
               : `File too large. Limit is ${formatFileSize(PHOTO_MAX_BYTES)}.`;
 
             setFeedback({
@@ -655,28 +581,9 @@ function ApiUploadPicker({
           });
 
           startTransition(async () => {
-            const supabase = createBrowserSupabaseClient();
-
-            if (!supabase) {
-              setFeedback({
-                tone: "error",
-                message: "Supabase browser connection is missing.",
-              });
-              setQueue((current) =>
-                current.map((item) => ({
-                  ...item,
-                  status: "error",
-                  message: "Supabase browser connection is missing.",
-                })),
-              );
-              return;
-            }
-
             try {
               const uploadedImages: ListingImage[] = [];
               let failedCount = 0;
-              let nextSortOrder = currentPhotoCount;
-              let nextCoverImageUrl = currentCoverImageUrl || "";
 
               for (const [index, queueItem] of queuedItems.entries()) {
                 const file = queueItem.file;
@@ -698,23 +605,13 @@ function ApiUploadPicker({
                 );
 
                 const compressedFile = await compressCarPhoto(file);
-                const safeName = sanitizeFileName(compressedFile.name);
-                const path = `car-photos/${listingId}/${Date.now()}-${safeName}`;
+                const payload = new FormData();
+                payload.append("listingId", listingId);
+                payload.append("images", compressedFile);
+                const result = await uploadListingImagesInlineAction(payload);
 
-                const { error: uploadError } = await supabase.storage
-                  .from("listing-photos")
-                  .upload(path, compressedFile, {
-                    contentType: compressedFile.type || "image/jpeg",
-                    upsert: false,
-                  });
-
-                if (uploadError) {
-                  console.error("Car photo upload error", {
-                    listingId,
-                    fileName: file.name,
-                    uploadError,
-                  });
-                  const message = getFriendlyUploadError(uploadError);
+                if (!result.success || !result.images?.length) {
+                  const message = result.message || "Photo upload failed.";
                   setQueue((current) =>
                     updateQueueItem(current, queueItem.id, {
                       status: "error",
@@ -725,64 +622,7 @@ function ApiUploadPicker({
                   continue;
                 }
 
-                const { data: publicData } = supabase.storage
-                  .from("listing-photos")
-                  .getPublicUrl(path);
-
-                const { data: insertedImage, error: insertError } = await supabase
-                  .from("listing_images")
-                  .insert({
-                    listing_id: listingId,
-                    image_url: publicData.publicUrl,
-                    sort_order: nextSortOrder,
-                  })
-                  .select("id,listing_id,image_url,sort_order")
-                  .single();
-
-                if (insertError || !insertedImage) {
-                  console.error("Car photo database insert error", {
-                    listingId,
-                    fileName: file.name,
-                    insertError,
-                  });
-                  const message = getFriendlyUploadError(insertError);
-                  setQueue((current) =>
-                    updateQueueItem(current, queueItem.id, {
-                      status: "error",
-                      message,
-                    }),
-                  );
-                  failedCount += 1;
-                  continue;
-                }
-
-                if (!nextCoverImageUrl) {
-                  const { error: coverError } = await supabase
-                    .from("listings")
-                    .update({
-                      cover_image_url: insertedImage.image_url,
-                    })
-                    .eq("id", listingId);
-
-                  if (coverError) {
-                    console.error("Cover image update error", {
-                      listingId,
-                      fileName: file.name,
-                      coverError,
-                    });
-                  } else {
-                    nextCoverImageUrl = insertedImage.image_url;
-                  }
-                }
-
-                uploadedImages.push({
-                  id: insertedImage.id,
-                  listingId: insertedImage.listing_id,
-                  imageUrl: insertedImage.image_url,
-                  sortOrder: insertedImage.sort_order,
-                });
-
-                nextSortOrder += 1;
+                uploadedImages.push(...result.images);
                 setQueue((current) =>
                   updateQueueItem(current, queueItem.id, {
                     status: "success",
@@ -1382,7 +1222,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                   listingId={file.id}
                   buttonLabel="Upload Seller Docs"
                   docType="seller_id"
-                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx"
                   onSuccess={(result) => {
                   if (result.success && result.documentId && result.fileUrl) {
                     setSellerDocs((current) => [
@@ -1617,7 +1457,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                           listingId={file.id}
                           buttonLabel={`Upload ${group.label}`}
                           docType={group.docType}
-                          accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx"
+                          accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx"
                           onSuccess={(result) => {
                             if (result.success && result.documentId && result.fileUrl) {
                               setCarDocs((current) => ({
@@ -1680,10 +1520,8 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                 <ApiUploadPicker
                   listingId={file.id}
                   buttonLabel="Upload Car Photos"
-                  accept=".jpg,.jpeg,.png,.webp,.heic"
+                  accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
                   multiple
-                  currentPhotoCount={carPhotos.length}
-                  currentCoverImageUrl={coverImageUrl}
                   onSuccess={(result) => {
                     if (result.success && result.images?.length) {
                       if (!coverImageUrl && result.images[0]?.imageUrl) {
@@ -1818,7 +1656,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                   listingId={file.id}
                   buttonLabel="Upload Buyer Docs"
                   docType="buyer_id"
-                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx"
                   onSuccess={(result) => {
                     if (result.success && result.documentId && result.fileUrl) {
                       setBuyerDocs((current) => [

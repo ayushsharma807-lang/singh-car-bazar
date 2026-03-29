@@ -86,9 +86,6 @@ export default async function CompletedFilesPage({
                         <Link href={`/admin/files/${file.id}`} className="text-sky-700 hover:underline">
                           Open File
                         </Link>
-                        <Link href={`/admin/files/${file.id}`} className="text-black hover:underline">
-                          View Details
-                        </Link>
                       </div>
                     </td>
                   </tr>

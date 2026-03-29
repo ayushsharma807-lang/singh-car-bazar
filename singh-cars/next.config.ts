@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const remotePatterns: NonNullable<NextConfig["images"]>["remotePatterns"] = [];
 
+remotePatterns.push({
+  protocol: "https",
+  hostname: "placehold.co",
+  pathname: "/**",
+});
+
 if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
   const supabaseUrl = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL);
   remotePatterns.push({

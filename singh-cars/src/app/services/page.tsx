@@ -8,7 +8,7 @@ export default function ServicesPage() {
         <p className="text-sm font-semibold uppercase tracking-[0.34em] text-[#ff8a2e]">
           Services
         </p>
-        <h1 className="mt-3 font-display text-6xl uppercase tracking-[0.08em] text-slate-900">
+        <h1 className="mt-3 font-display text-4xl uppercase tracking-[0.08em] text-slate-900 sm:text-6xl">
           Services
         </h1>
         <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600">

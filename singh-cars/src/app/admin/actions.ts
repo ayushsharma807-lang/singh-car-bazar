@@ -356,13 +356,22 @@ export async function updateSellerInfoAction(formData: FormData) {
     throw new Error("Unable to update seller info.");
   }
 
+  const submittedSellerType = String(formData.get("sellerType") || "").trim();
+  const { data: existingSeller } = await supabase
+    .from("sellers")
+    .select("seller_type")
+    .eq("listing_id", listingId)
+    .maybeSingle();
+
+  const sellerType = submittedSellerType || existingSeller?.seller_type || "dealer";
+
   const { error } = await supabase.from("sellers").upsert({
     listing_id: listingId,
     name: String(formData.get("sellerName") || ""),
     phone: String(formData.get("sellerPhone") || ""),
     address: String(formData.get("sellerAddress") || "") || null,
     notes: String(formData.get("sellerNotes") || "") || null,
-    seller_type: "dealer",
+    seller_type: sellerType,
   });
 
   if (error) {
@@ -735,7 +744,7 @@ export async function uploadDocumentInlineAction(formData: FormData) {
   if (!allowedTypes.includes(file.type) && !hasAllowedExtension) {
     return {
       success: false,
-      message: "Please upload PDF, JPG, PNG, WEBP, HEIC, DOC, or DOCX.",
+      message: "Please upload PDF, JPG, JPEG, PNG, WEBP, HEIC, HEIF, DOC, or DOCX.",
     };
   }
 
@@ -939,7 +948,7 @@ export async function uploadListingImagesInlineAction(formData: FormData) {
     if (!uploadedCount) {
       return {
         success: false,
-        message: "Photo upload failed. Please try JPG, PNG, WEBP, or HEIC.",
+        message: "Photo upload failed. Please try JPG, JPEG, PNG, WEBP, HEIC, or HEIF.",
       };
     }
 
