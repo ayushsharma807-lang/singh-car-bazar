@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getPublicListingChecklist } from "@/lib/data";
+import { buildAdminCarName, getPublicListingChecklist } from "@/lib/data";
 import { formatDateTime } from "@/lib/utils";
 import type { AdminFileRecord } from "@/types";
 import { StatusPill } from "@/components/admin/status-pill";
@@ -17,10 +17,10 @@ export function RecentFilesTable({ files }: { files: AdminFileRecord[] }) {
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">{file.fileNumber}</p>
               <h3 className="mt-2 text-base font-semibold text-black">
-                {file.carName} · {file.numberPlate}
+                {buildAdminCarName(file.listing)} · {file.numberPlate || "No number plate added"}
               </h3>
               <p className="mt-1 text-sm text-gray-600">
-                Seller: {file.sellerName} · Buyer: {file.buyerName ?? "Not added yet"}
+                Seller: {file.sellerName || "Not added yet"} · Buyer: {file.buyerName ?? "Not added yet"}
               </p>
               <p className="mt-1 text-xs text-gray-400">{formatDateTime(file.updatedAt)}</p>
             </div>

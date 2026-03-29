@@ -156,6 +156,8 @@ async function revalidateAdminFilePaths(listingId: string) {
   revalidatePath("/inventory");
   revalidatePath("/admin");
   revalidatePath("/admin/files");
+  revalidatePath("/admin/files/new");
+  revalidatePath("/admin/completed-files");
   revalidatePath(`/admin/files/${listingId}`);
   revalidatePath(`/admin/files/${listingId}/edit`);
 }

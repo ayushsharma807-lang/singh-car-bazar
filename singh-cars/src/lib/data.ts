@@ -1,4 +1,6 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { demoInquiries, demoListings } from "@/lib/demo-data";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type {
@@ -184,6 +186,17 @@ export function getPublicListingChecklist(missing: string[]) {
   return missing.map((item) => labels[item] ?? `Missing ${item}`);
 }
 
+export function buildAdminCarName(
+  listing: Pick<Listing, "make" | "model" | "variant">,
+) {
+  const title = [listing.make, listing.model, listing.variant]
+    .filter((value) => value && String(value).trim())
+    .join(" ")
+    .trim();
+
+  return title || "No car details added";
+}
+
 function applyInventoryFilters(listings: Listing[], filters: InventoryFilters) {
   return listings.filter((listing) => {
     if (filters.search) {
@@ -244,12 +257,16 @@ async function fetchListingsFromSupabase({
   admin?: boolean;
   filters?: InventoryFilters;
 }) {
+  if (admin) {
+    noStore();
+  }
+
   const supabase = admin
-    ? await createServerSupabaseClient()
+    ? createSupabaseAdminClient()
     : await getPublicSupabase();
 
   if (!supabase) {
-    return null;
+    return admin ? [] : null;
   }
 
   let query = supabase
@@ -297,7 +314,7 @@ async function fetchListingsFromSupabase({
   const { data, error } = await query;
 
   if (error || !data) {
-    return null;
+    return admin ? [] : null;
   }
 
   return data.map((row) => mapListing(row as ListingRow));
@@ -330,13 +347,12 @@ export async function getAdminListings(filters: {
   status?: string;
   sellerType?: string;
 } = {}) {
-  const listings =
-    (await fetchListingsFromSupabase({
-      admin: true,
-      filters: {
-        search: filters.search,
-      },
-    })) ?? demoListings;
+  const listings = (await fetchListingsFromSupabase({
+    admin: true,
+    filters: {
+      search: filters.search,
+    },
+  })) ?? [];
 
   return listings.filter((listing) => {
     if (filters.search) {
@@ -439,11 +455,11 @@ function toAdminFileRecord(listing: Listing): AdminFileRecord {
   return {
     id: listing.id,
     fileNumber: listing.stockNumber,
-    carName: `${listing.make} ${listing.model}${listing.variant ? ` ${listing.variant}` : ""}`,
+    carName: buildAdminCarName(listing),
     numberPlate: listing.numberPlate,
-    sellerName: listing.seller?.name ?? "Unknown Seller",
+    sellerName: listing.seller?.name?.trim() || "Not added yet",
     sellerPhone: listing.seller?.phone ?? null,
-    buyerName: listing.buyer?.name ?? null,
+    buyerName: listing.buyer?.name?.trim() || null,
     buyerPhone: listing.buyer?.phone ?? null,
     status: listing.status,
     sellerType: listing.sellerType,

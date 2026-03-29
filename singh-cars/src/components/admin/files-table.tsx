@@ -1,5 +1,6 @@
+import Image from "next/image";
 import Link from "next/link";
-import { getPublicListingChecklist } from "@/lib/data";
+import { buildAdminCarName, getPublicListingChecklist } from "@/lib/data";
 import type { AdminFileRecord } from "@/types";
 import { StatusPill } from "@/components/admin/status-pill";
 
@@ -12,14 +13,19 @@ export function FilesTable({ files }: { files: AdminFileRecord[] }) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">{file.fileNumber}</p>
-                <h2 className="mt-2 text-lg font-semibold text-black">{file.carName}</h2>
-                <p className="mt-1 text-sm text-gray-500">{file.numberPlate}</p>
+                <div className="mt-3 flex items-start gap-3">
+                  <CarThumb file={file} />
+                  <div>
+                    <h2 className="text-lg font-semibold text-black">{buildAdminCarName(file.listing)}</h2>
+                    <p className="mt-1 text-sm text-gray-500">{file.numberPlate || "No number plate added"}</p>
+                  </div>
+                </div>
               </div>
               <StatusPill status={file.status} />
             </div>
 
             <div className="mt-4 grid gap-3 rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
-              <p><span className="font-semibold text-black">Seller:</span> {file.sellerName}</p>
+              <p><span className="font-semibold text-black">Seller:</span> {file.sellerName || "Not added yet"}</p>
               <p><span className="font-semibold text-black">Buyer:</span> {file.buyerName ?? "Not added yet"}</p>
               <p><span className="font-semibold text-black">Stage:</span> {file.stage}</p>
             </div>
@@ -80,10 +86,15 @@ export function FilesTable({ files }: { files: AdminFileRecord[] }) {
               <tr key={file.id} className="border-t border-gray-200 text-gray-700">
                 <td className="px-4 py-3 font-semibold text-black">{file.fileNumber}</td>
                 <td className="px-4 py-3">
-                  <p className="font-medium">{file.carName}</p>
-                  <p className="text-xs text-gray-500">{file.numberPlate}</p>
+                  <div className="flex items-start gap-3">
+                    <CarThumb file={file} />
+                    <div>
+                      <p className="font-medium text-black">{buildAdminCarName(file.listing)}</p>
+                      <p className="text-xs text-gray-500">{file.numberPlate || "No number plate added"}</p>
+                    </div>
+                  </div>
                 </td>
-                <td className="px-4 py-3">{file.sellerName}</td>
+                <td className="px-4 py-3">{file.sellerName || "Not added yet"}</td>
                 <td className="px-4 py-3">{file.buyerName ?? "Not added yet"}</td>
                 <td className="px-4 py-3">
                   <StatusPill status={file.status} />
@@ -124,6 +135,28 @@ export function FilesTable({ files }: { files: AdminFileRecord[] }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function CarThumb({ file }: { file: AdminFileRecord }) {
+  const imageUrl = file.listing.coverImageUrl || file.listing.images[0]?.imageUrl || null;
+
+  if (imageUrl) {
+    return (
+      <Image
+        src={imageUrl}
+        alt={buildAdminCarName(file.listing)}
+        width={80}
+        height={56}
+        className="h-14 w-20 rounded-lg border border-gray-200 object-cover"
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-14 w-20 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+      No Photo
     </div>
   );
 }
