@@ -113,12 +113,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
             </p>
           </div>
 
-          <div
-            className="mt-8 grid gap-6"
-            style={{
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            }}
-          >
+          <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {listings.length ? (
               listings.map((listing) => (
                 <InventoryCard key={listing.id} listing={listing} />
