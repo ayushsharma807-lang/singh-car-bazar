@@ -114,8 +114,7 @@ export function ListingForm({ listing }: ListingFormProps) {
         ))}
       </div>
 
-      {step === "seller" ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-5">
+      <section className={step === "seller" ? "rounded-xl border border-gray-200 bg-white p-5" : "hidden"}>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500">Seller</p>
           <h2 className="mt-2 text-2xl font-semibold text-black">Who is giving this car?</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -133,7 +132,6 @@ export function ListingForm({ listing }: ListingFormProps) {
                 name="sellerPhone"
                 defaultValue={listing?.seller?.phone ?? ""}
                 placeholder="Seller phone number"
-                required
               />
             </label>
             <label className="md:col-span-2">
@@ -143,7 +141,6 @@ export function ListingForm({ listing }: ListingFormProps) {
                 name="sellerName"
                 defaultValue={listing?.seller?.name ?? ""}
                 placeholder="Seller name"
-                required
               />
             </label>
           </div>
@@ -175,21 +172,19 @@ export function ListingForm({ listing }: ListingFormProps) {
           <div className="mt-6 flex justify-end">
             <NextStepButton currentStep="seller" setStep={setStep} />
           </div>
-        </section>
-      ) : null}
+      </section>
 
-      {step === "car" ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-5">
+      <section className={step === "car" ? "rounded-xl border border-gray-200 bg-white p-5" : "hidden"}>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500">Car</p>
           <h2 className="mt-2 text-2xl font-semibold text-black">Add the car details</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label>
               <FieldLabel>Make</FieldLabel>
-              <input className="admin-field h-14" name="make" defaultValue={listing?.make ?? ""} placeholder="Maruti, Hyundai, Honda..." required />
+              <input className="admin-field h-14" name="make" defaultValue={listing?.make ?? ""} placeholder="Maruti, Hyundai, Honda..." />
             </label>
             <label>
               <FieldLabel>Model</FieldLabel>
-              <input className="admin-field h-14" name="model" defaultValue={listing?.model ?? ""} placeholder="Swift, Creta, City..." required />
+              <input className="admin-field h-14" name="model" defaultValue={listing?.model ?? ""} placeholder="Swift, Creta, City..." />
             </label>
             <label>
               <FieldLabel>Variant</FieldLabel>
@@ -197,27 +192,27 @@ export function ListingForm({ listing }: ListingFormProps) {
             </label>
             <label>
               <FieldLabel>Year</FieldLabel>
-              <input className="admin-field h-14" type="number" name="year" defaultValue={listing?.year ?? ""} placeholder="Year" required />
+              <input className="admin-field h-14" type="number" name="year" defaultValue={listing?.year ?? ""} placeholder="Year" />
             </label>
             <label>
               <FieldLabel>Fuel</FieldLabel>
-              <input className="admin-field h-14" name="fuel" defaultValue={listing?.fuel ?? ""} placeholder="Petrol, Diesel, CNG..." required />
+              <input className="admin-field h-14" name="fuel" defaultValue={listing?.fuel ?? ""} placeholder="Petrol, Diesel, CNG..." />
             </label>
             <label>
               <FieldLabel>Transmission</FieldLabel>
-              <input className="admin-field h-14" name="transmission" defaultValue={listing?.transmission ?? ""} placeholder="Manual or Automatic" required />
+              <input className="admin-field h-14" name="transmission" defaultValue={listing?.transmission ?? ""} placeholder="Manual or Automatic" />
             </label>
             <label>
               <FieldLabel>KM</FieldLabel>
-              <input className="admin-field h-14" type="number" name="kmDriven" defaultValue={listing?.kmDriven ?? ""} placeholder="KM driven" required />
+              <input className="admin-field h-14" type="number" name="kmDriven" defaultValue={listing?.kmDriven ?? ""} placeholder="KM driven" />
             </label>
             <label>
               <FieldLabel>Price</FieldLabel>
-              <input className="admin-field h-14" type="number" name="price" defaultValue={listing?.price ?? ""} placeholder="Price" required />
+              <input className="admin-field h-14" type="number" name="price" defaultValue={listing?.price ?? ""} placeholder="Price" />
             </label>
             <label>
               <FieldLabel>Number Plate</FieldLabel>
-              <input className="admin-field h-14" name="numberPlate" defaultValue={listing?.numberPlate ?? ""} placeholder="Number plate" required />
+              <input className="admin-field h-14" name="numberPlate" defaultValue={listing?.numberPlate ?? ""} placeholder="Number plate" />
             </label>
             <label>
               <FieldLabel>Photos</FieldLabel>
@@ -294,11 +289,9 @@ export function ListingForm({ listing }: ListingFormProps) {
             </button>
             <NextStepButton currentStep="car" setStep={setStep} />
           </div>
-        </section>
-      ) : null}
+      </section>
 
-      {step === "save" ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-5">
+      <section className={step === "save" ? "rounded-xl border border-gray-200 bg-white p-5" : "hidden"}>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500">Save</p>
           <h2 className="mt-2 text-2xl font-semibold text-black">Save this car file</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -372,8 +365,7 @@ export function ListingForm({ listing }: ListingFormProps) {
               </button>
             </div>
           </div>
-        </section>
-      ) : null}
+      </section>
     </form>
   );
 }
