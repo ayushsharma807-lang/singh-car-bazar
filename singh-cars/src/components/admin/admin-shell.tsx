@@ -1,16 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import {
-  CarFront,
-  CheckCheck,
-  FilePlus2,
-  Files,
-  CircleHelp,
-  LayoutGrid,
-  LogOut,
-  Search,
-} from "lucide-react";
+import { CarFront, FilePlus2, LogOut, Search } from "lucide-react";
 import { adminSignOutAction } from "@/app/admin/actions";
+import {
+  DesktopAdminNav,
+  MobileBottomNav,
+} from "@/components/admin/admin-navigation";
 import { getDashboardSummary } from "@/lib/data";
 
 export async function AdminShell({
@@ -24,21 +19,22 @@ export async function AdminShell({
 }) {
   const summary = await getDashboardSummary();
   const navItems = [
-    { href: "/admin", label: "Home", icon: LayoutGrid },
-    { href: "/admin/files", label: "Car Files", icon: Files },
-    { href: "/admin/files/new", label: "Add Car", icon: FilePlus2 },
+    { href: "/admin", label: "Home", icon: "home" as const },
+    { href: "/admin/files", label: "Car Files", icon: "files" as const },
+    { href: "/admin/files/new", label: "Add Car", icon: "add" as const },
     {
       href: "/admin/completed-files",
       label: "Completed Files",
-      icon: CheckCheck,
+      icon: "completed" as const,
       count: summary.completedFiles,
     },
-    { href: "/admin/help", label: "Help", icon: CircleHelp },
+    { href: "/admin/help", label: "Help", icon: "help" as const },
   ];
+  const mobileNavItems = navItems.filter((item) => item.href !== "/admin/files/new");
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
-      <div className="mx-auto flex min-h-screen max-w-[1680px] gap-4 px-3 py-3 lg:px-4">
+      <div className="mx-auto flex min-h-screen max-w-[1680px] gap-4 px-3 py-3 pb-28 lg:px-4 lg:pb-3">
         <aside className="flex w-[220px] shrink-0 flex-col justify-between rounded-xl border border-gray-200 bg-white p-4 shadow-sm max-lg:hidden">
           <div className="grid gap-5">
             <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3">
@@ -53,31 +49,7 @@ export async function AdminShell({
               </div>
             </div>
 
-            <nav className="grid gap-2">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-sm font-semibold text-gray-800 transition hover:border-gray-200 hover:bg-gray-50"
-                  >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-black">
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                      <span>{item.label}</span>
-                      {"count" in item ? (
-                        <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-semibold text-gray-700">
-                          {item.count}
-                        </span>
-                      ) : null}
-                    </span>
-                  </Link>
-                );
-              })}
-            </nav>
+            <DesktopAdminNav items={navItems} />
           </div>
 
           <form action={adminSignOutAction}>
@@ -129,6 +101,7 @@ export async function AdminShell({
           <main className="min-w-0 flex-1">{children}</main>
         </div>
       </div>
+      <MobileBottomNav items={mobileNavItems} />
       <FloatingAddButton />
     </div>
   );
@@ -138,7 +111,7 @@ function FloatingAddButton() {
   return (
     <Link
       href="/admin/files/new"
-      className="admin-btn fixed bottom-5 right-5 z-40 shadow-sm lg:hidden"
+      className="admin-btn fixed bottom-20 right-4 z-50 shadow-sm sm:bottom-24 sm:right-5 lg:hidden"
       title="New File"
     >
       <FilePlus2 className="h-5 w-5" />
