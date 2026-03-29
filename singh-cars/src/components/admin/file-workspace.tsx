@@ -109,7 +109,9 @@ const DOCUMENT_EXTENSIONS = [
 
 function getFileName(url: string) {
   try {
-    const pathname = new URL(url).pathname;
+    const parsedUrl = new URL(url, "https://local.storage");
+    const proxyPath = parsedUrl.searchParams.get("path");
+    const pathname = proxyPath || parsedUrl.pathname;
     return decodeURIComponent(pathname.split("/").pop() || "file");
   } catch {
     return "file";
@@ -1844,13 +1846,38 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
 
                     return (
                       <div key={group.docType} className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4">
-                        <div>
-                          <p className="text-sm font-semibold text-black">{group.label}</p>
-                          <p className="text-sm text-gray-600">
-                            {documents.length
-                              ? `${documents.length} file${documents.length > 1 ? "s" : ""} uploaded`
-                              : group.emptyText}
-                          </p>
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-black">{group.label}</p>
+                            <p className="text-sm text-gray-600">
+                              {documents.length
+                                ? `${documents.length} file${documents.length > 1 ? "s" : ""} uploaded`
+                                : group.emptyText}
+                            </p>
+                          </div>
+                          <UploadPicker
+                            listingId={file.id}
+                            buttonLabel={`Upload ${group.label}`}
+                            docType={group.docType}
+                            accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx"
+                            onSuccess={(result) => {
+                              if (result.success && result.documentId && result.fileUrl) {
+                                setCarDocs((current) => ({
+                                  ...current,
+                                  [group.docType]: [
+                                    ...(current[group.docType] ?? []),
+                                    {
+                                      id: result.documentId!,
+                                      listingId: file.id,
+                                      docType: result.docType || group.docType,
+                                      fileUrl: result.fileUrl!,
+                                      notes: result.notes || null,
+                                    },
+                                  ],
+                                }));
+                              }
+                            }}
+                          />
                         </div>
                         {documents.length ? (
                           <div className="grid gap-4 sm:grid-cols-2">
@@ -1881,13 +1908,29 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                 </div>
               </div>
               <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <div>
-                  <p className="text-sm font-semibold text-black">Car photos</p>
-                  <p className="text-sm text-gray-600">
-                    {carPhotos.length
-                      ? `${carPhotos.length} photo${carPhotos.length > 1 ? "s" : ""} uploaded`
-                      : "No car photos uploaded yet"}
-                  </p>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-black">Car photos</p>
+                    <p className="text-sm text-gray-600">
+                      {carPhotos.length
+                        ? `${carPhotos.length} photo${carPhotos.length > 1 ? "s" : ""} uploaded`
+                        : "No car photos uploaded yet"}
+                    </p>
+                  </div>
+                  <ApiUploadPicker
+                    listingId={file.id}
+                    buttonLabel={carPhotos.length ? "Add More Photos" : "Upload Car Photos"}
+                    accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
+                    multiple
+                    onSuccess={(result) => {
+                      if (result.success && result.images?.length) {
+                        if (!coverImageUrl && result.images[0]?.imageUrl) {
+                          setCoverImageUrl(result.images[0].imageUrl);
+                        }
+                        setCarPhotos((current) => [...current, ...result.images!]);
+                      }
+                    }}
+                  />
                 </div>
                 {carPhotos.length ? (
                   <div className="grid gap-4 sm:grid-cols-2">
