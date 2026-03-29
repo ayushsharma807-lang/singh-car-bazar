@@ -756,114 +756,128 @@ export async function removeDocumentByIdAction(formData: FormData) {
 }
 
 export async function uploadListingImagesInlineAction(formData: FormData) {
-  await requireAdminSession();
+  try {
+    await requireAdminSession();
 
-  const supabase = createSupabaseAdminClient();
-  const listingId = String(formData.get("listingId") || "");
-  const files = formData
-    .getAll("images")
-    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+    const supabase = createSupabaseAdminClient();
+    const listingId = String(formData.get("listingId") || "");
+    const files = formData
+      .getAll("images")
+      .filter((entry): entry is File => entry instanceof File && entry.size > 0);
 
-  if (!listingId) {
-    return {
-      success: false,
-      message: "Car file was not found.",
-    };
-  }
-
-  if (!files.length) {
-    return {
-      success: false,
-      message: "Please choose at least one photo.",
-    };
-  }
-
-  if (!supabase) {
-    return {
-      success: false,
-      message: "Supabase admin connection is missing.",
-    };
-  }
-
-  const { data: existingImages } = await supabase
-    .from("listing_images")
-    .select("id,sort_order,image_url")
-    .eq("listing_id", listingId)
-    .order("sort_order", { ascending: true });
-
-  let nextSortOrder = existingImages?.length ?? 0;
-
-  const { data: listing } = await supabase
-    .from("listings")
-    .select("cover_image_url")
-    .eq("id", listingId)
-    .maybeSingle();
-
-  let coverImageUrl = listing?.cover_image_url ?? null;
-  let uploadedCount = 0;
-  const uploadedImages: { id: string; listingId: string; imageUrl: string; sortOrder: number }[] = [];
-
-  for (const file of files) {
-    if (!file.type.startsWith("image/")) {
-      continue;
+    if (!listingId) {
+      return {
+        success: false,
+        message: "Car file was not found.",
+      };
     }
 
-    const extension = file.name.split(".").pop() || "jpg";
-    const path = `${listingId}/${Date.now()}-${randomUUID()}.${extension}`;
-    const uploadResult = await uploadFileWithResult("listing-photos", path, file);
-
-    if (!uploadResult.publicUrl) {
-      continue;
+    if (!files.length) {
+      return {
+        success: false,
+        message: "Please choose at least one photo.",
+      };
     }
 
-    const { data: insertedImage } = await supabase
+    if (!supabase) {
+      return {
+        success: false,
+        message: "Supabase admin connection is missing.",
+      };
+    }
+
+    const { data: existingImages } = await supabase
       .from("listing_images")
-      .insert({
-        listing_id: listingId,
-        image_url: uploadResult.publicUrl,
-        sort_order: nextSortOrder,
+      .select("id,sort_order,image_url")
+      .eq("listing_id", listingId)
+      .order("sort_order", { ascending: true });
+
+    let nextSortOrder = existingImages?.length ?? 0;
+
+    const { data: listing } = await supabase
+      .from("listings")
+      .select("cover_image_url")
+      .eq("id", listingId)
+      .maybeSingle();
+
+    let coverImageUrl = listing?.cover_image_url ?? null;
+    let uploadedCount = 0;
+    const uploadedImages: { id: string; listingId: string; imageUrl: string; sortOrder: number }[] = [];
+
+    for (const file of files) {
+      const hasImageMime = file.type.startsWith("image/");
+      const hasImageExtension = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"]
+        .some((extension) => file.name.toLowerCase().endsWith(extension));
+
+      if (!hasImageMime && !hasImageExtension) {
+        continue;
+      }
+
+      const extension = file.name.split(".").pop() || "jpg";
+      const path = `${listingId}/${Date.now()}-${randomUUID()}.${extension}`;
+      const uploadResult = await uploadFileWithResult("listing-photos", path, file);
+
+      if (!uploadResult.publicUrl) {
+        continue;
+      }
+
+      const { data: insertedImage } = await supabase
+        .from("listing_images")
+        .insert({
+          listing_id: listingId,
+          image_url: uploadResult.publicUrl,
+          sort_order: nextSortOrder,
+        })
+        .select("id,image_url,sort_order")
+        .single();
+
+      if (!coverImageUrl) {
+        coverImageUrl = uploadResult.publicUrl;
+      }
+
+      if (insertedImage) {
+        uploadedImages.push({
+          id: insertedImage.id,
+          listingId,
+          imageUrl: insertedImage.image_url,
+          sortOrder: insertedImage.sort_order,
+        });
+      }
+
+      nextSortOrder += 1;
+      uploadedCount += 1;
+    }
+
+    if (!uploadedCount) {
+      return {
+        success: false,
+        message: "Photo upload failed. Please try JPG, PNG, WEBP, or HEIC.",
+      };
+    }
+
+    await supabase
+      .from("listings")
+      .update({
+        cover_image_url: coverImageUrl,
       })
-      .select("id,image_url,sort_order")
-      .single();
+      .eq("id", listingId);
 
-    if (!coverImageUrl) {
-      coverImageUrl = uploadResult.publicUrl;
-    }
+    await revalidateAdminFilePaths(listingId);
 
-    if (insertedImage) {
-      uploadedImages.push({
-        id: insertedImage.id,
-        listingId,
-        imageUrl: insertedImage.image_url,
-        sortOrder: insertedImage.sort_order,
-      });
-    }
-
-    nextSortOrder += 1;
-    uploadedCount += 1;
-  }
-
-  if (!uploadedCount) {
+    return {
+      success: true,
+      message: `${uploadedCount} photo${uploadedCount > 1 ? "s" : ""} uploaded successfully.`,
+      images: uploadedImages,
+    };
+  } catch (error) {
     return {
       success: false,
-      message: "Photo upload failed. Please try again.",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Photo upload failed. Please try again.",
     };
   }
-
-  await supabase
-    .from("listings")
-    .update({
-      cover_image_url: coverImageUrl,
-    })
-    .eq("id", listingId);
-
-  await revalidateAdminFilePaths(listingId);
-
-  return {
-    success: true,
-    message: `${uploadedCount} photo${uploadedCount > 1 ? "s" : ""} uploaded successfully.`,
-    images: uploadedImages,
-  };
 }
 
 export async function removeListingImageByIdAction(formData: FormData) {

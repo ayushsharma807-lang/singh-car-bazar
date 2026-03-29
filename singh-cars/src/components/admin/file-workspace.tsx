@@ -223,24 +223,34 @@ function UploadPicker({
           });
 
           startTransition(async () => {
-            const result = await action(uploadFormData);
+            try {
+              const result = await action(uploadFormData);
 
-            if (result.success) {
-              setFeedback({
-                tone: "success",
-                message: result.message,
-              });
-              onSuccess?.(result);
+              if (result.success) {
+                setFeedback({
+                  tone: "success",
+                  message: result.message,
+                });
+                onSuccess?.(result);
 
-              if (!onSuccess) {
-                window.setTimeout(() => {
-                  router.refresh();
-                }, 700);
+                if (!onSuccess) {
+                  window.setTimeout(() => {
+                    router.refresh();
+                  }, 700);
+                }
+              } else {
+                setFeedback({
+                  tone: "error",
+                  message: result.message,
+                });
               }
-            } else {
+            } catch (error) {
               setFeedback({
                 tone: "error",
-                message: result.message,
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : "Upload failed. Please try again.",
               });
             }
           });
