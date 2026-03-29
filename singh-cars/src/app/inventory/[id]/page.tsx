@@ -5,7 +5,7 @@ import { InquiryForm } from "@/components/public/inquiry-form";
 import { StatusBadge } from "@/components/public/status-badge";
 import { SiteShell } from "@/components/public/site-shell";
 import { siteConfig } from "@/config/site";
-import { getListingById } from "@/lib/data";
+import { buildListingTitle, getListingById } from "@/lib/data";
 import { formatNumber, formatPrice } from "@/lib/utils";
 
 type CarDetailPageProps = {
@@ -39,7 +39,10 @@ export default async function CarDetailPage({ params }: CarDetailPageProps) {
     notFound();
   }
 
-  const title = `${listing.make} ${listing.model}${listing.variant ? ` ${listing.variant}` : ""}`;
+  const title =
+    buildListingTitle(listing) ||
+    [listing.make, listing.model, listing.variant].filter(Boolean).join(" ") ||
+    "Car details";
 
   return (
     <SiteShell currentPath="/inventory" compactFooter>
@@ -56,7 +59,7 @@ export default async function CarDetailPage({ params }: CarDetailPageProps) {
                   {listing.make}
                 </p>
                 <h1 className="mt-2 font-display text-4xl uppercase tracking-[0.08em] text-slate-900 sm:text-5xl">
-                  {listing.model}
+                  {title}
                 </h1>
                 <p className="mt-3 text-lg text-slate-600">
                   {listing.variant || `${listing.year} model`}

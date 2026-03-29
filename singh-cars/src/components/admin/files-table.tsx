@@ -29,10 +29,19 @@ export function FilesTable({ files }: { files: AdminFileRecord[] }) {
               <DocBadge label="Buyer Docs" ready={file.documentStatus.buyerReady} />
             </div>
 
+            <div className="mt-3">
+              <PublicBadge ready={file.publicListingStatus.ready} />
+            </div>
+
             <div className="mt-4 flex gap-3">
               <Link href={`/admin/files/${file.id}`} className="admin-btn flex-1 text-center">
                 Open File
               </Link>
+              {file.publicListingStatus.ready ? (
+                <Link href={`/inventory/${file.id}`} className="admin-btn flex-1 text-center">
+                  View Public Listing
+                </Link>
+              ) : null}
               <Link href={`/admin/files/${file.id}/edit`} className="admin-btn flex-1 text-center">
                 Edit Car
               </Link>
@@ -45,7 +54,7 @@ export function FilesTable({ files }: { files: AdminFileRecord[] }) {
         <table className="min-w-full text-left text-sm">
           <thead className="bg-white text-gray-500">
             <tr>
-              {["File", "Car", "Seller", "Buyer", "Status", "Seller Docs", "Car Docs", "Buyer Docs", "Actions"].map((heading) => (
+              {["File", "Car", "Seller", "Buyer", "Status", "Seller Docs", "Car Docs", "Buyer Docs", "Public", "Actions"].map((heading) => (
                 <th key={heading} className="px-4 py-3 font-medium">
                   {heading}
                 </th>
@@ -68,11 +77,17 @@ export function FilesTable({ files }: { files: AdminFileRecord[] }) {
                 <td className="px-4 py-3"><DocBadge label="Seller" ready={file.documentStatus.sellerReady} compact /></td>
                 <td className="px-4 py-3"><DocBadge label="Car" ready={file.documentStatus.carReady} compact /></td>
                 <td className="px-4 py-3"><DocBadge label="Buyer" ready={file.documentStatus.buyerReady} compact /></td>
+                <td className="px-4 py-3"><PublicBadge ready={file.publicListingStatus.ready} compact /></td>
                 <td className="px-4 py-3">
                   <div className="flex gap-3">
                     <Link href={`/admin/files/${file.id}`} className="text-sky-700 hover:underline">
                       Open File
                     </Link>
+                    {file.publicListingStatus.ready ? (
+                      <Link href={`/inventory/${file.id}`} className="text-gray-700 hover:underline">
+                        View Public
+                      </Link>
+                    ) : null}
                     <Link href={`/admin/files/${file.id}/edit`} className="text-black hover:underline">
                       Edit Car
                     </Link>
@@ -84,6 +99,24 @@ export function FilesTable({ files }: { files: AdminFileRecord[] }) {
         </table>
       </div>
     </div>
+  );
+}
+
+function PublicBadge({
+  ready,
+  compact = false,
+}: {
+  ready: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center justify-center rounded-xl border px-3 py-2 text-xs font-semibold ${
+        ready ? "border-green-200 bg-green-50 text-green-800" : "border-amber-200 bg-amber-50 text-amber-800"
+      } ${compact ? "" : "w-full"}`}
+    >
+      {compact ? (ready ? "Ready" : "Incomplete") : `Public: ${ready ? "Ready" : "Incomplete"}`}
+    </span>
   );
 }
 

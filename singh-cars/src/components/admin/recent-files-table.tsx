@@ -36,6 +36,9 @@ export function RecentFilesTable({ files }: { files: AdminFileRecord[] }) {
             <span className={`rounded-xl border px-3 py-2 ${file.documentStatus.buyerReady ? "border-gray-200 bg-white text-black" : "border-gray-300 bg-gray-100 text-gray-800"}`}>
               Buyer Docs {file.documentStatus.buyerReady ? "Ready" : "Missing"}
             </span>
+            <span className={`rounded-xl border px-3 py-2 ${file.publicListingStatus.ready ? "border-green-200 bg-green-50 text-green-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+              Public {file.publicListingStatus.ready ? "Ready" : "Incomplete"}
+            </span>
           </div>
         </Link>
       ))}

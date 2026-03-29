@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { PlaceholderMedia } from "@/components/public/placeholder-media";
+import { buildListingTitle } from "@/lib/data";
 import { formatNumber, formatPrice } from "@/lib/utils";
 import type { Listing } from "@/types";
 
 export function InventoryCard({ listing }: { listing: Listing }) {
   const featuredImage = listing.coverImageUrl ?? listing.images[0]?.imageUrl ?? "";
-  const title = `${listing.year} ${listing.make} ${listing.model}${listing.variant ? ` ${listing.variant}` : ""}`;
+  const title = buildListingTitle(listing) || [listing.make, listing.model, listing.variant].filter(Boolean).join(" ") || "Car details coming soon";
 
   return (
     <Link href={`/inventory/${listing.id}`} className="block">

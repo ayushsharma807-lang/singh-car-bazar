@@ -73,6 +73,14 @@ type ListingRow = {
 };
 
 function mapListing(row: ListingRow): Listing {
+  const images =
+    row.listing_images?.map((image) => ({
+      id: image.id,
+      listingId: image.listing_id,
+      imageUrl: image.image_url,
+      sortOrder: image.sort_order,
+    })) ?? [];
+
   return {
     id: row.id,
     createdAt: row.created_at,
@@ -95,13 +103,7 @@ function mapListing(row: ListingRow): Listing {
     status: row.status,
     featured: row.featured,
     coverImageUrl: row.cover_image_url,
-    images:
-      row.listing_images?.map((image) => ({
-        id: image.id,
-        listingId: image.listing_id,
-        imageUrl: image.image_url,
-        sortOrder: image.sort_order,
-      })) ?? [],
+    images: images.sort((left, right) => left.sortOrder - right.sortOrder),
     seller: row.sellers?.[0]
       ? {
           id: row.sellers[0].id,
@@ -132,6 +134,42 @@ function mapListing(row: ListingRow): Listing {
         fileUrl: document.file_url,
         notes: document.notes,
       })) ?? [],
+  };
+}
+
+export function buildListingTitle(listing: Pick<Listing, "year" | "make" | "model" | "variant">) {
+  return [listing.year, listing.make, listing.model, listing.variant]
+    .filter((value) => value && String(value).trim())
+    .join(" ")
+    .trim();
+}
+
+export function getPublicListingStatus(
+  listing: Pick<Listing, "status" | "make" | "model" | "variant" | "year" | "price" | "images" | "coverImageUrl">,
+) {
+  const missing: string[] = [];
+  const title = buildListingTitle(listing);
+  const hasPhoto = Boolean(listing.coverImageUrl || listing.images.length);
+
+  if (listing.status !== "available") {
+    missing.push("status");
+  }
+
+  if (!title) {
+    missing.push("title");
+  }
+
+  if (!listing.price) {
+    missing.push("price");
+  }
+
+  if (!hasPhoto) {
+    missing.push("photo");
+  }
+
+  return {
+    ready: missing.length === 0,
+    missing,
   };
 }
 
@@ -257,11 +295,11 @@ async function fetchListingsFromSupabase({
 export async function getListings(filters: InventoryFilters = {}) {
   const listings = await fetchListingsFromSupabase({ filters });
   if (listings) {
-    return listings;
+    return listings.filter((listing) => getPublicListingStatus(listing).ready);
   }
 
   return applyInventoryFilters(
-    demoListings.filter((listing) => listing.status === "available"),
+    demoListings.filter((listing) => getPublicListingStatus(listing).ready),
     filters,
   );
 }
@@ -358,6 +396,7 @@ function toAdminFileRecord(listing: Listing): AdminFileRecord {
     updatedAt: listing.updatedAt ?? listing.createdAt,
     stage: inferStage(listing),
     documentStatus: inferDocumentStatus(listing),
+    publicListingStatus: getPublicListingStatus(listing),
     listing,
   };
 }

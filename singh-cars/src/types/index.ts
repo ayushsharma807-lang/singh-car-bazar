@@ -92,6 +92,11 @@ export type FileDocumentStatus = {
   buyerReady: boolean;
 };
 
+export type PublicListingStatus = {
+  ready: boolean;
+  missing: string[];
+};
+
 export type AdminFileRecord = {
   id: string;
   fileNumber: string;
@@ -106,6 +111,7 @@ export type AdminFileRecord = {
   updatedAt?: string;
   stage: FileWorkflowStage;
   documentStatus: FileDocumentStatus;
+  publicListingStatus: PublicListingStatus;
   listing: Listing;
 };
 
