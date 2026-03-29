@@ -112,6 +112,7 @@ export type AdminFileRecord = {
   stage: FileWorkflowStage;
   documentStatus: FileDocumentStatus;
   publicListingStatus: PublicListingStatus;
+  isCompletedFile: boolean;
   listing: Listing;
 };
 
@@ -121,5 +122,6 @@ export type DealerDashboardSummary = {
   soldCars: number;
   filesMissingBuyerDocuments: number;
   filesMissingSellerDocuments: number;
+  completedFiles: number;
   recentFiles: AdminFileRecord[];
 };

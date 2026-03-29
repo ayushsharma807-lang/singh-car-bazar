@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   CarFront,
+  CheckCheck,
   FilePlus2,
   Files,
   CircleHelp,
@@ -10,15 +11,9 @@ import {
   Search,
 } from "lucide-react";
 import { adminSignOutAction } from "@/app/admin/actions";
+import { getDashboardSummary } from "@/lib/data";
 
-const navItems = [
-  { href: "/admin", label: "Home", icon: LayoutGrid },
-  { href: "/admin/files", label: "Car Files", icon: Files },
-  { href: "/admin/files/new", label: "Add Car", icon: FilePlus2 },
-  { href: "/admin/help", label: "Help", icon: CircleHelp },
-];
-
-export function AdminShell({
+export async function AdminShell({
   children,
   searchAction = "/admin/files",
   searchPlaceholder = "Search by Number Plate, file no., seller, buyer...",
@@ -27,6 +22,20 @@ export function AdminShell({
   searchAction?: string;
   searchPlaceholder?: string;
 }) {
+  const summary = await getDashboardSummary();
+  const navItems = [
+    { href: "/admin", label: "Home", icon: LayoutGrid },
+    { href: "/admin/files", label: "Car Files", icon: Files },
+    { href: "/admin/files/new", label: "Add Car", icon: FilePlus2 },
+    {
+      href: "/admin/completed-files",
+      label: "Completed Files",
+      icon: CheckCheck,
+      count: summary.completedFiles,
+    },
+    { href: "/admin/help", label: "Help", icon: CircleHelp },
+  ];
+
   return (
     <div className="min-h-screen bg-white text-gray-900">
       <div className="mx-auto flex min-h-screen max-w-[1680px] gap-4 px-3 py-3 lg:px-4">
@@ -57,7 +66,14 @@ export function AdminShell({
                     <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-black">
                       <Icon className="h-4 w-4" />
                     </span>
-                    {item.label}
+                    <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                      <span>{item.label}</span>
+                      {"count" in item ? (
+                        <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-semibold text-gray-700">
+                          {item.count}
+                        </span>
+                      ) : null}
+                    </span>
                   </Link>
                 );
               })}

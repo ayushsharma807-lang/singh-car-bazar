@@ -379,6 +379,49 @@ function inferDocumentStatus(listing: Listing) {
   };
 }
 
+function isSellerInfoComplete(listing: Listing) {
+  return Boolean(listing.seller?.name?.trim() && listing.seller?.phone?.trim());
+}
+
+function isCarInfoComplete(listing: Listing) {
+  return Boolean(
+    listing.numberPlate?.trim() &&
+      listing.make?.trim() &&
+      listing.model?.trim() &&
+      listing.year &&
+      listing.kmDriven >= 0 &&
+      listing.fuel?.trim() &&
+      listing.transmission?.trim() &&
+      listing.price,
+  );
+}
+
+function isBuyerInfoComplete(listing: Listing) {
+  return Boolean(
+    listing.buyer?.name?.trim() &&
+      listing.buyer?.phone?.trim() &&
+      (listing.buyer?.soldPrice || listing.price),
+  );
+}
+
+export function isCompletedFile(listing: Listing) {
+  const sellerDocsReady = listing.documents.some((document) => document.docType === "seller_id");
+  const carDocsReady = listing.documents.some((document) =>
+    ["rc", "insurance", "loan_noc", "other"].includes(document.docType),
+  );
+  const buyerDocsReady = listing.documents.some((document) => document.docType === "buyer_id");
+
+  return Boolean(
+    listing.status === "sold" &&
+      isSellerInfoComplete(listing) &&
+      isCarInfoComplete(listing) &&
+      isBuyerInfoComplete(listing) &&
+      sellerDocsReady &&
+      carDocsReady &&
+      buyerDocsReady,
+  );
+}
+
 function inferStage(listing: Listing): "seller" | "car" | "buyer" {
   if (listing.buyer?.name || listing.status === "sold") {
     return "buyer";
@@ -408,6 +451,7 @@ function toAdminFileRecord(listing: Listing): AdminFileRecord {
     stage: inferStage(listing),
     documentStatus: inferDocumentStatus(listing),
     publicListingStatus: getPublicListingStatus(listing),
+    isCompletedFile: isCompletedFile(listing),
     listing,
   };
 }
@@ -417,6 +461,7 @@ export async function getAdminFiles(filters: {
   status?: string;
   sellerType?: string;
   missing?: string;
+  completed?: "only" | "exclude" | "include";
 } = {}) {
   const listings = await getAdminListings({
     search: filters.query,
@@ -426,6 +471,17 @@ export async function getAdminFiles(filters: {
 
   return listings
     .map(toAdminFileRecord)
+    .filter((file) => {
+      if (filters.completed === "only") {
+        return file.isCompletedFile;
+      }
+
+      if (filters.completed === "include") {
+        return true;
+      }
+
+      return !file.isCompletedFile;
+    })
     .filter((file) => {
       if (!filters.query) {
         return true;
@@ -460,24 +516,27 @@ export async function getAdminFiles(filters: {
 }
 
 export async function getAdminFileById(id: string) {
-  const files = await getAdminFiles();
+  const files = await getAdminFiles({ completed: "include" });
   return files.find((file) => file.id === id) ?? null;
 }
 
 export async function getDashboardSummary(): Promise<DealerDashboardSummary> {
-  const files = await getAdminFiles();
+  const allFiles = await getAdminFiles({ completed: "include" });
+  const activeFiles = allFiles.filter((file) => !file.isCompletedFile);
+  const completedFiles = allFiles.filter((file) => file.isCompletedFile);
 
   return {
-    totalFiles: files.length,
-    carsInStock: files.filter((file) => file.status === "available").length,
-    soldCars: files.filter((file) => file.status === "sold").length,
-    filesMissingBuyerDocuments: files.filter(
+    totalFiles: activeFiles.length,
+    carsInStock: activeFiles.filter((file) => file.status === "available").length,
+    soldCars: activeFiles.filter((file) => file.status === "sold").length,
+    filesMissingBuyerDocuments: activeFiles.filter(
       (file) => !file.documentStatus.buyerReady,
     ).length,
-    filesMissingSellerDocuments: files.filter(
+    filesMissingSellerDocuments: activeFiles.filter(
       (file) => !file.documentStatus.sellerReady,
     ).length,
-    recentFiles: [...files]
+    completedFiles: completedFiles.length,
+    recentFiles: [...activeFiles]
       .sort((a, b) =>
         new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime(),
       )

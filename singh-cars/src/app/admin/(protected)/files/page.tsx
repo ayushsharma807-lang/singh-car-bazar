@@ -16,6 +16,7 @@ export default async function AdminFilesPage({
     status: params.status,
     sellerType: params.sellerType,
     missing: params.missing,
+    completed: "exclude",
   });
 
   const title = getPageTitle(params);
@@ -44,7 +45,7 @@ function getPageTitle(searchParams: Record<string, string | undefined>) {
   }
 
   if (searchParams.status === "sold") {
-    return "Sold cars";
+    return "Sold cars still being finished";
   }
 
   if (searchParams.missing === "buyer") {
@@ -55,5 +56,5 @@ function getPageTitle(searchParams: Record<string, string | undefined>) {
     return "Files missing seller docs";
   }
 
-  return "Search by Number Plate, file number, seller, buyer, or phone";
+  return "Active files by Number Plate, file number, seller, buyer, or phone";
 }
