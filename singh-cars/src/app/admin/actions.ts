@@ -330,7 +330,7 @@ export async function updateSellerInfoAction(formData: FormData) {
     throw new Error("Unable to update seller info.");
   }
 
-  await supabase.from("sellers").upsert({
+  const { error } = await supabase.from("sellers").upsert({
     listing_id: listingId,
     name: String(formData.get("sellerName") || ""),
     phone: String(formData.get("sellerPhone") || ""),
@@ -338,6 +338,11 @@ export async function updateSellerInfoAction(formData: FormData) {
     notes: String(formData.get("sellerNotes") || "") || null,
     seller_type: "dealer",
   });
+
+  if (error) {
+    console.error("Seller update failed", { listingId, error });
+    throw new Error(`Seller save failed: ${error.message}`);
+  }
 
   await redirectToAdminFile(listingId);
 }
@@ -357,23 +362,70 @@ export async function updateCarInfoAction(formData: FormData) {
   }
 
   const status = String(formData.get("status") || "").trim() || "available";
+  const { data: existingListing, error: existingError } = await supabase
+    .from("listings")
+    .select(
+      "id,stock_number,variant,color,location,description,featured,cover_image_url,seller_type,owner_count",
+    )
+    .eq("id", listingId)
+    .maybeSingle();
 
-  await supabase.from("listings").update({
-    stock_number: String(formData.get("stockNumber") || ""),
-    make: String(formData.get("make") || ""),
-    model: String(formData.get("model") || ""),
-    variant: String(formData.get("variant") || "") || null,
+  if (existingError || !existingListing) {
+    console.error("Car update failed to load existing listing", {
+      listingId,
+      existingError,
+    });
+    throw new Error(
+      existingError?.message || "Car file could not be loaded before saving.",
+    );
+  }
+
+  const stockNumber =
+    String(formData.get("stockNumber") || "").trim() ||
+    existingListing.stock_number ||
+    `FILE-${listingId.slice(0, 8).toUpperCase()}`;
+  const location =
+    String(formData.get("location") || "").trim() || existingListing.location || "Jalandhar";
+
+  const updatePayload = {
+    stock_number: stockNumber,
+    make: String(formData.get("make") || "").trim(),
+    model: String(formData.get("model") || "").trim(),
+    variant:
+      String(formData.get("variant") || "").trim() ||
+      existingListing.variant ||
+      null,
     year: Number(formData.get("year") || 0),
-    number_plate: String(formData.get("numberPlate") || ""),
+    number_plate: String(formData.get("numberPlate") || "").trim(),
     km_driven: Number(formData.get("kmDriven") || 0),
-    fuel: String(formData.get("fuel") || ""),
-    transmission: String(formData.get("transmission") || ""),
+    fuel: String(formData.get("fuel") || "").trim(),
+    transmission: String(formData.get("transmission") || "").trim(),
     price: Number(formData.get("price") || 0),
-    color: String(formData.get("color") || "") || null,
-    location: String(formData.get("location") || ""),
-    description: String(formData.get("description") || "") || null,
+    color:
+      String(formData.get("color") || "").trim() ||
+      existingListing.color ||
+      null,
+    location,
+    description:
+      String(formData.get("description") || "").trim() ||
+      existingListing.description ||
+      null,
     status,
-  }).eq("id", listingId);
+    featured: existingListing.featured,
+    cover_image_url: existingListing.cover_image_url,
+    seller_type: existingListing.seller_type,
+    owner_count: existingListing.owner_count,
+  };
+
+  const { error } = await supabase
+    .from("listings")
+    .update(updatePayload)
+    .eq("id", listingId);
+
+  if (error) {
+    console.error("Car update failed", { listingId, updatePayload, error });
+    throw new Error(`Car save failed: ${error.message}`);
+  }
 
   await redirectToAdminFile(listingId);
 }
@@ -425,7 +477,7 @@ export async function updateBuyerInfoAction(formData: FormData) {
   if (!buyerName && !buyerPhone && !buyerAddress && !buyerNotes && !formData.get("soldPrice") && !formData.get("saleDate")) {
     await supabase.from("buyers").delete().eq("listing_id", listingId);
   } else {
-    await supabase.from("buyers").upsert({
+    const { error } = await supabase.from("buyers").upsert({
       listing_id: listingId,
       name: buyerName || null,
       phone: buyerPhone || null,
@@ -433,6 +485,11 @@ export async function updateBuyerInfoAction(formData: FormData) {
       sold_price: Number(formData.get("soldPrice") || 0) || null,
       sale_date: String(formData.get("saleDate") || "") || null,
     });
+
+    if (error) {
+      console.error("Buyer update failed", { listingId, error });
+      throw new Error(`Buyer save failed: ${error.message}`);
+    }
   }
 
   await redirectToAdminFile(listingId);
