@@ -56,24 +56,34 @@ type UploadQueueItem = {
 type SellerDraft = {
   name: string;
   phone: string;
+  address: string;
+  notes: string;
 };
 
 type CarDraft = {
   numberPlate: string;
   make: string;
   model: string;
+  variant: string;
   year: string;
   kmDriven: string;
   fuel: string;
   transmission: string;
   price: string;
   status: string;
+  color: string;
+  location: string;
+  description: string;
+  ownerCount: string;
 };
 
 type BuyerDraft = {
   name: string;
   phone: string;
   soldPrice: string;
+  address: string;
+  notes: string;
+  saleDate: string;
 };
 
 const carDocumentGroups = [
@@ -775,6 +785,48 @@ function SummaryLine({ label, value }: { label: string; value: string }) {
   );
 }
 
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{label}</p>
+      <div className="max-w-[65%] text-right text-sm font-medium text-black">{value}</div>
+    </div>
+  );
+}
+
+function SectionView({
+  title,
+  text,
+  onEdit,
+  children,
+}: {
+  title: string;
+  text: string;
+  onEdit: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="grid gap-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-base font-semibold text-black">{title}</p>
+          <p className="mt-1 text-sm text-gray-600">{text}</p>
+        </div>
+        <button type="button" className="admin-btn admin-btn-sm" onClick={onEdit}>
+          Edit
+        </button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function StepShell({
   icon,
   title,
@@ -1105,27 +1157,40 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
     () => parseBuyerNotes(file.listing.buyer?.notes),
     [file.listing.buyer?.notes],
   );
-
-  const [sellerDraft, setSellerDraft] = useState<SellerDraft>({
+  const initialSellerDraft: SellerDraft = {
     name: file.listing.seller?.name ?? "",
     phone: file.listing.seller?.phone ?? "",
-  });
-  const [carDraft, setCarDraft] = useState<CarDraft>({
+    address: file.listing.seller?.address ?? "",
+    notes: file.listing.seller?.notes ?? "",
+  };
+  const initialCarDraft: CarDraft = {
     numberPlate: file.listing.numberPlate ?? "",
     make: file.listing.make ?? "",
     model: file.listing.model ?? "",
+    variant: file.listing.variant ?? "",
     year: String(file.listing.year ?? ""),
     kmDriven: String(file.listing.kmDriven ?? ""),
     fuel: file.listing.fuel ?? "",
     transmission: file.listing.transmission ?? "",
     price: String(file.listing.price ?? ""),
     status: file.listing.status ?? "available",
-  });
-  const [buyerDraft, setBuyerDraft] = useState<BuyerDraft>({
+    color: file.listing.color ?? "",
+    location: file.listing.location ?? "",
+    description: file.listing.description ?? "",
+    ownerCount: file.listing.ownerCount ? String(file.listing.ownerCount) : "",
+  };
+  const initialBuyerDraft: BuyerDraft = {
     name: file.listing.buyer?.name ?? "",
     phone: file.listing.buyer?.phone ?? "",
     soldPrice: file.listing.buyer?.soldPrice ? String(file.listing.buyer.soldPrice) : "",
-  });
+    address: buyerFields.address,
+    notes: buyerFields.notes,
+    saleDate: file.listing.buyer?.saleDate ?? "",
+  };
+
+  const [sellerDraft, setSellerDraft] = useState<SellerDraft>(initialSellerDraft);
+  const [carDraft, setCarDraft] = useState<CarDraft>(initialCarDraft);
+  const [buyerDraft, setBuyerDraft] = useState<BuyerDraft>(initialBuyerDraft);
 
   const [sellerDocs, setSellerDocs] = useState<ListingDocument[]>(
     getDocumentsByType(file.listing.documents, "seller_id"),
@@ -1157,11 +1222,19 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
       ? "seller"
       : !carDone
         ? "car"
-        : "buyer"
+        : buyerDone
+          ? "car"
+          : "buyer"
     : !sellerDone
       ? "seller"
       : "car";
   const [activeStep, setActiveStep] = useState<FileStep>(defaultStep);
+  const [editingStep, setEditingStep] = useState<FileStep | null>(
+    !sellerDone ? "seller" : !carDone ? "car" : showBuyerStep && !buyerDone ? "buyer" : null,
+  );
+  const isSellerEditing = activeStep === "seller" && editingStep === "seller";
+  const isCarEditing = activeStep === "car" && editingStep === "car";
+  const isBuyerEditing = activeStep === "buyer" && editingStep === "buyer";
 
   return (
     <div className="grid gap-5">
@@ -1179,7 +1252,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
         icon={<CircleUserRound className="h-5 w-5" />}
         title="Step 1 — Seller"
         emptyText={sellerDone ? "Seller details are ready." : "No seller added"}
-        actionLabel={sellerDone ? "Edit Seller" : "+ Add Seller"}
+        actionLabel={sellerDone ? "Saved" : "+ Add Seller"}
         isOpen={activeStep === "seller"}
         onToggle={() => setActiveStep("seller")}
         summary={
@@ -1189,39 +1262,142 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
           </>
         }
       >
-        <form action={updateSellerInfoAction} className="grid gap-4">
-          <input type="hidden" name="listingId" value={file.id} />
-          <div className="grid gap-4 md:grid-cols-2">
-            <label>
-              <span className="mb-2 block text-sm font-semibold text-gray-800">Name</span>
-              <input
-                className="admin-field h-12"
-                name="sellerName"
-                value={sellerDraft.name}
-                onChange={(event) =>
-                  setSellerDraft((current) => ({ ...current, name: event.target.value }))
-                }
-                required
-              />
-            </label>
-            <label>
-              <span className="mb-2 block text-sm font-semibold text-gray-800">Phone</span>
-              <input
-                className="admin-field h-12"
-                name="sellerPhone"
-                value={sellerDraft.phone}
-                onChange={(event) =>
-                  setSellerDraft((current) => ({ ...current, phone: event.target.value }))
-                }
-                required
-              />
-            </label>
-          </div>
-          <input type="hidden" name="sellerAddress" value={file.listing.seller?.address ?? ""} />
-          <input type="hidden" name="sellerNotes" value={file.listing.seller?.notes ?? ""} />
+        {isSellerEditing ? (
+          <form action={updateSellerInfoAction} className="grid gap-4">
+            <input type="hidden" name="listingId" value={file.id} />
+            <div className="grid gap-4 md:grid-cols-2">
+              <label>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Name</span>
+                <input
+                  className="admin-field h-12"
+                  name="sellerName"
+                  value={sellerDraft.name}
+                  onChange={(event) =>
+                    setSellerDraft((current) => ({ ...current, name: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Phone</span>
+                <input
+                  className="admin-field h-12"
+                  name="sellerPhone"
+                  value={sellerDraft.phone}
+                  onChange={(event) =>
+                    setSellerDraft((current) => ({ ...current, phone: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label className="md:col-span-2">
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Address</span>
+                <input
+                  className="admin-field h-12"
+                  name="sellerAddress"
+                  value={sellerDraft.address}
+                  onChange={(event) =>
+                    setSellerDraft((current) => ({ ...current, address: event.target.value }))
+                  }
+                />
+              </label>
+              <label className="md:col-span-2">
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Notes</span>
+                <textarea
+                  className="admin-field min-h-[110px]"
+                  name="sellerNotes"
+                  value={sellerDraft.notes}
+                  onChange={(event) =>
+                    setSellerDraft((current) => ({ ...current, notes: event.target.value }))
+                  }
+                />
+              </label>
+            </div>
 
-          <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-black">Seller documents</p>
+                  <p className="text-sm text-gray-600">
+                    {sellerDocs.length
+                      ? `${sellerDocs.length} file${sellerDocs.length > 1 ? "s" : ""} uploaded`
+                      : "No seller docs uploaded yet"}
+                  </p>
+                </div>
+                <UploadPicker
+                  listingId={file.id}
+                  buttonLabel="Upload Seller Docs"
+                  docType="seller_id"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx"
+                  onSuccess={(result) => {
+                    if (result.success && result.documentId && result.fileUrl) {
+                      setSellerDocs((current) => [
+                        ...current,
+                        {
+                          id: result.documentId!,
+                          listingId: file.id,
+                          docType: result.docType || "seller_id",
+                          fileUrl: result.fileUrl!,
+                          notes: result.notes || null,
+                        },
+                      ]);
+                    }
+                  }}
+                />
+              </div>
+
+              {sellerDocs.length ? (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {sellerDocs.map((document) => (
+                    <SellerDocCard
+                      key={document.id}
+                      document={document}
+                      listingId={file.id}
+                      onRemove={(documentId) =>
+                        setSellerDocs((current) => current.filter((entry) => entry.id !== documentId))
+                      }
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-sm text-gray-600">
+                  No seller docs uploaded yet
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <button type="submit" className="admin-btn h-11 px-4 text-sm">
+                Save Seller
+              </button>
+              <button
+                type="button"
+                className="admin-btn h-11 px-4 text-sm"
+                onClick={() => {
+                  setSellerDraft(initialSellerDraft);
+                  setEditingStep(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <SectionView
+            title="Seller info"
+            text="Saved seller details for this file."
+            onEdit={() => {
+              setActiveStep("seller");
+              setEditingStep("seller");
+            }}
+          >
+            <div className="grid gap-2 sm:grid-cols-2">
+              <DetailRow label="Name" value={sellerDraft.name.trim() || "No seller added"} />
+              <DetailRow label="Phone" value={sellerDraft.phone.trim() || "No seller added"} />
+              <DetailRow label="Address" value={sellerDraft.address.trim() || "Not added"} />
+              <DetailRow label="Notes" value={sellerDraft.notes.trim() || "Not added"} />
+            </div>
+            <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <div>
                 <p className="text-sm font-semibold text-black">Seller documents</p>
                 <p className="text-sm text-gray-600">
@@ -1230,68 +1406,34 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                     : "No seller docs uploaded yet"}
                 </p>
               </div>
-                <UploadPicker
-                  listingId={file.id}
-                  buttonLabel="Upload Seller Docs"
-                  docType="seller_id"
-                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx"
-                  onSuccess={(result) => {
-                  if (result.success && result.documentId && result.fileUrl) {
-                    setSellerDocs((current) => [
-                      ...current,
-                      {
-                        id: result.documentId!,
-                        listingId: file.id,
-                        docType: result.docType || "seller_id",
-                        fileUrl: result.fileUrl!,
-                        notes: result.notes || null,
-                      },
-                    ]);
-                  }
-                }}
-              />
+              {sellerDocs.length ? (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {sellerDocs.map((document) => (
+                    <SellerDocCard
+                      key={document.id}
+                      document={document}
+                      listingId={file.id}
+                      onRemove={(documentId) =>
+                        setSellerDocs((current) => current.filter((entry) => entry.id !== documentId))
+                      }
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-5 text-sm text-gray-600">
+                  No seller docs uploaded yet
+                </div>
+              )}
             </div>
-
-            {sellerDocs.length ? (
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {sellerDocs.map((document) => (
-                  <SellerDocCard
-                    key={document.id}
-                    document={document}
-                    listingId={file.id}
-                    onRemove={(documentId) =>
-                      setSellerDocs((current) => current.filter((entry) => entry.id !== documentId))
-                    }
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-sm text-gray-600">
-                No seller docs uploaded yet
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <button type="submit" className="admin-btn h-12 px-5 text-base">
-              Save Seller
-            </button>
-            <button
-              type="button"
-              className="admin-btn h-12 px-5 text-base"
-              onClick={() => setActiveStep("car")}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+          </SectionView>
+        )}
       </StepShell>
 
       <StepShell
         icon={<CarFront className="h-5 w-5" />}
         title="Step 2 — Car"
         emptyText={carDone ? "Car details are saved." : "No car details added"}
-        actionLabel={carDone ? "Edit Car" : "+ Add Car"}
+        actionLabel={carDone ? "Saved" : "+ Add Car"}
         isOpen={activeStep === "car"}
         onToggle={() => setActiveStep("car")}
         summary={
@@ -1312,134 +1454,382 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
           </>
         }
       >
-        <form action={updateCarInfoAction} className="grid gap-4">
-          <input type="hidden" name="listingId" value={file.id} />
-          <input type="hidden" name="stockNumber" value={file.listing.stockNumber} />
-          <input type="hidden" name="variant" value={file.listing.variant ?? ""} />
-          <input type="hidden" name="color" value={file.listing.color ?? ""} />
-          <input type="hidden" name="location" value={file.listing.location ?? ""} />
-          <input type="hidden" name="description" value={file.listing.description ?? ""} />
+        {isCarEditing ? (
+          <form action={updateCarInfoAction} className="grid gap-4">
+            <input type="hidden" name="listingId" value={file.id} />
+            <input type="hidden" name="stockNumber" value={file.listing.stockNumber} />
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <label>
-              <span className="mb-2 block text-sm font-semibold text-gray-800">Number Plate</span>
-              <input
-                className="admin-field h-12"
-                name="numberPlate"
-                value={carDraft.numberPlate}
-                onChange={(event) =>
-                  setCarDraft((current) => ({ ...current, numberPlate: event.target.value }))
-                }
-                required
-              />
-            </label>
-            <label>
-              <span className="mb-2 block text-sm font-semibold text-gray-800">Make</span>
-              <input
-                className="admin-field h-12"
-                name="make"
-                value={carDraft.make}
-                onChange={(event) =>
-                  setCarDraft((current) => ({ ...current, make: event.target.value }))
-                }
-                required
-              />
-            </label>
-            <label>
-              <span className="mb-2 block text-sm font-semibold text-gray-800">Model</span>
-              <input
-                className="admin-field h-12"
-                name="model"
-                value={carDraft.model}
-                onChange={(event) =>
-                  setCarDraft((current) => ({ ...current, model: event.target.value }))
-                }
-                required
-              />
-            </label>
-            <label>
-              <span className="mb-2 block text-sm font-semibold text-gray-800">Year</span>
-              <input
-                className="admin-field h-12"
-                type="number"
-                name="year"
-                value={carDraft.year}
-                onChange={(event) =>
-                  setCarDraft((current) => ({ ...current, year: event.target.value }))
-                }
-                required
-              />
-            </label>
-            <label>
-              <span className="mb-2 block text-sm font-semibold text-gray-800">KM</span>
-              <input
-                className="admin-field h-12"
-                type="number"
-                name="kmDriven"
-                value={carDraft.kmDriven}
-                onChange={(event) =>
-                  setCarDraft((current) => ({ ...current, kmDriven: event.target.value }))
-                }
-                required
-              />
-            </label>
-            <label>
-              <span className="mb-2 block text-sm font-semibold text-gray-800">Fuel</span>
-              <input
-                className="admin-field h-12"
-                name="fuel"
-                value={carDraft.fuel}
-                onChange={(event) =>
-                  setCarDraft((current) => ({ ...current, fuel: event.target.value }))
-                }
-                required
-              />
-            </label>
-            <label>
-              <span className="mb-2 block text-sm font-semibold text-gray-800">Transmission</span>
-              <input
-                className="admin-field h-12"
-                name="transmission"
-                value={carDraft.transmission}
-                onChange={(event) =>
-                  setCarDraft((current) => ({ ...current, transmission: event.target.value }))
-                }
-                required
-              />
-            </label>
-            <label>
-              <span className="mb-2 block text-sm font-semibold text-gray-800">Price</span>
-              <input
-                className="admin-field h-12"
-                type="number"
-                name="price"
-                value={carDraft.price}
-                onChange={(event) =>
-                  setCarDraft((current) => ({ ...current, price: event.target.value }))
-                }
-                required
-              />
-            </label>
-            <label>
-              <span className="mb-2 block text-sm font-semibold text-gray-800">Status</span>
-              <select
-                className="admin-field h-12"
-                name="status"
-                value={carDraft.status}
-                onChange={(event) =>
-                  setCarDraft((current) => ({ ...current, status: event.target.value }))
-                }
+            <div className="grid gap-4 md:grid-cols-2">
+              <label>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Number Plate</span>
+                <input
+                  className="admin-field h-12"
+                  name="numberPlate"
+                  value={carDraft.numberPlate}
+                  onChange={(event) =>
+                    setCarDraft((current) => ({ ...current, numberPlate: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Make</span>
+                <input
+                  className="admin-field h-12"
+                  name="make"
+                  value={carDraft.make}
+                  onChange={(event) =>
+                    setCarDraft((current) => ({ ...current, make: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Model</span>
+                <input
+                  className="admin-field h-12"
+                  name="model"
+                  value={carDraft.model}
+                  onChange={(event) =>
+                    setCarDraft((current) => ({ ...current, model: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Variant</span>
+                <input
+                  className="admin-field h-12"
+                  name="variant"
+                  value={carDraft.variant}
+                  onChange={(event) =>
+                    setCarDraft((current) => ({ ...current, variant: event.target.value }))
+                  }
+                />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Year</span>
+                <input
+                  className="admin-field h-12"
+                  type="number"
+                  name="year"
+                  value={carDraft.year}
+                  onChange={(event) =>
+                    setCarDraft((current) => ({ ...current, year: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">KM</span>
+                <input
+                  className="admin-field h-12"
+                  type="number"
+                  name="kmDriven"
+                  value={carDraft.kmDriven}
+                  onChange={(event) =>
+                    setCarDraft((current) => ({ ...current, kmDriven: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Fuel</span>
+                <input
+                  className="admin-field h-12"
+                  name="fuel"
+                  value={carDraft.fuel}
+                  onChange={(event) =>
+                    setCarDraft((current) => ({ ...current, fuel: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Transmission</span>
+                <input
+                  className="admin-field h-12"
+                  name="transmission"
+                  value={carDraft.transmission}
+                  onChange={(event) =>
+                    setCarDraft((current) => ({ ...current, transmission: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Price</span>
+                <input
+                  className="admin-field h-12"
+                  type="number"
+                  name="price"
+                  value={carDraft.price}
+                  onChange={(event) =>
+                    setCarDraft((current) => ({ ...current, price: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Status</span>
+                <select
+                  className="admin-field h-12"
+                  name="status"
+                  value={carDraft.status}
+                  onChange={(event) =>
+                    setCarDraft((current) => ({ ...current, status: event.target.value }))
+                  }
+                >
+                  <option value="available">Available</option>
+                  <option value="booked">Booked</option>
+                  <option value="sold">Sold</option>
+                </select>
+              </label>
+            </div>
+
+            <details className="rounded-2xl border border-gray-200 bg-white p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-black">More details</summary>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <label>
+                  <span className="mb-2 block text-sm font-semibold text-gray-800">Color</span>
+                  <input
+                    className="admin-field h-12"
+                    name="color"
+                    value={carDraft.color}
+                    onChange={(event) =>
+                      setCarDraft((current) => ({ ...current, color: event.target.value }))
+                    }
+                  />
+                </label>
+                <label>
+                  <span className="mb-2 block text-sm font-semibold text-gray-800">Location</span>
+                  <input
+                    className="admin-field h-12"
+                    name="location"
+                    value={carDraft.location}
+                    onChange={(event) =>
+                      setCarDraft((current) => ({ ...current, location: event.target.value }))
+                    }
+                  />
+                </label>
+                <label>
+                  <span className="mb-2 block text-sm font-semibold text-gray-800">Owner Count</span>
+                  <input
+                    className="admin-field h-12"
+                    type="number"
+                    name="ownerCount"
+                    value={carDraft.ownerCount}
+                    onChange={(event) =>
+                      setCarDraft((current) => ({ ...current, ownerCount: event.target.value }))
+                    }
+                  />
+                </label>
+                <label className="md:col-span-2">
+                  <span className="mb-2 block text-sm font-semibold text-gray-800">Notes / Description</span>
+                  <textarea
+                    className="admin-field min-h-[110px]"
+                    name="description"
+                    value={carDraft.description}
+                    onChange={(event) =>
+                      setCarDraft((current) => ({ ...current, description: event.target.value }))
+                    }
+                  />
+                </label>
+              </div>
+            </details>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-black">Car documents</p>
+                    <p className="text-sm text-gray-600">
+                      {Object.values(carDocs).flat().length
+                        ? `${Object.values(carDocs).flat().length} file${Object.values(carDocs).flat().length > 1 ? "s" : ""} uploaded`
+                        : "No car docs uploaded yet"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4">
+                  {carDocumentGroups.map((group) => {
+                    const documents = carDocs[group.docType] ?? [];
+
+                    return (
+                      <div key={group.docType} className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-black">{group.label}</p>
+                            <p className="text-sm text-gray-600">
+                              {documents.length
+                                ? `${documents.length} file${documents.length > 1 ? "s" : ""} uploaded`
+                                : group.emptyText}
+                            </p>
+                          </div>
+                          <UploadPicker
+                            listingId={file.id}
+                            buttonLabel={`Upload ${group.label}`}
+                            docType={group.docType}
+                            accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx"
+                            onSuccess={(result) => {
+                              if (result.success && result.documentId && result.fileUrl) {
+                                setCarDocs((current) => ({
+                                  ...current,
+                                  [group.docType]: [
+                                    ...(current[group.docType] ?? []),
+                                    {
+                                      id: result.documentId!,
+                                      listingId: file.id,
+                                      docType: result.docType || group.docType,
+                                      fileUrl: result.fileUrl!,
+                                      notes: result.notes || null,
+                                    },
+                                  ],
+                                }));
+                              }
+                            }}
+                          />
+                        </div>
+
+                        {documents.length ? (
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            {documents.map((document) => (
+                              <SellerDocCard
+                                key={document.id}
+                                document={document}
+                                listingId={file.id}
+                                onRemove={(documentId) =>
+                                  setCarDocs((current) => ({
+                                    ...current,
+                                    [group.docType]: (current[group.docType] ?? []).filter(
+                                      (entry) => entry.id !== documentId,
+                                    ),
+                                  }))
+                                }
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-gray-600">
+                            {group.emptyText}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-black">Car photos</p>
+                    <p className="text-sm text-gray-600">
+                      {carPhotos.length
+                        ? `${carPhotos.length} photo${carPhotos.length > 1 ? "s" : ""} uploaded`
+                        : "No car photos uploaded yet"}
+                    </p>
+                  </div>
+                  <ApiUploadPicker
+                    listingId={file.id}
+                    buttonLabel="Upload Car Photos"
+                    accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
+                    multiple
+                    onSuccess={(result) => {
+                      if (result.success && result.images?.length) {
+                        if (!coverImageUrl && result.images[0]?.imageUrl) {
+                          setCoverImageUrl(result.images[0].imageUrl);
+                        }
+                        setCarPhotos((current) => [...current, ...result.images!]);
+                      }
+                    }}
+                  />
+                </div>
+
+                {carPhotos.length ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {carPhotos.map((image) => (
+                      <PhotoCard
+                        key={image.id}
+                        image={image}
+                        listingId={file.id}
+                        isCover={coverImageUrl === image.imageUrl}
+                        onSetCover={(_, imageUrl) => setCoverImageUrl(imageUrl)}
+                        onRemove={(imageId) =>
+                          setCarPhotos((current) => {
+                            const next = current.filter((entry) => entry.id !== imageId);
+                            const nextCover =
+                              next.find((entry) => entry.imageUrl === coverImageUrl)?.imageUrl ??
+                              next[0]?.imageUrl ??
+                              "";
+                            setCoverImageUrl(nextCover);
+                            return next;
+                          })
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-sm text-gray-600">
+                    No car photos uploaded yet
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <button type="submit" className="admin-btn h-11 px-4 text-sm">
+                Save Car
+              </button>
+              <button
+                type="button"
+                className="admin-btn h-11 px-4 text-sm"
+                onClick={() => {
+                  setCarDraft(initialCarDraft);
+                  setEditingStep(null);
+                }}
               >
-                <option value="available">Available</option>
-                <option value="booked">Booked</option>
-                <option value="sold">Sold</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <SectionView
+            title="Car info"
+            text="Saved car details for this file."
+            onEdit={() => {
+              setActiveStep("car");
+              setEditingStep("car");
+            }}
+          >
+            <div className="grid gap-2 sm:grid-cols-2">
+              <DetailRow label="Number Plate" value={carDraft.numberPlate.trim() || "Not added"} />
+              <DetailRow label="Make" value={carDraft.make.trim() || "Not added"} />
+              <DetailRow label="Model" value={carDraft.model.trim() || "Not added"} />
+              <DetailRow label="Variant" value={carDraft.variant.trim() || "Not added"} />
+              <DetailRow label="Year" value={carDraft.year.trim() || "Not added"} />
+              <DetailRow label="KM" value={carDraft.kmDriven.trim() || "Not added"} />
+              <DetailRow label="Fuel" value={carDraft.fuel.trim() || "Not added"} />
+              <DetailRow label="Transmission" value={carDraft.transmission.trim() || "Not added"} />
+              <DetailRow label="Price" value={formatPrice(carDraft.price)} />
+              <DetailRow
+                label="Status"
+                value={
+                  carDraft.status === "sold"
+                    ? "Sold"
+                    : carDraft.status === "booked"
+                      ? "Booked"
+                      : "Available"
+                }
+              />
+              <DetailRow label="Color" value={carDraft.color.trim() || "Not added"} />
+              <DetailRow label="Location" value={carDraft.location.trim() || "Not added"} />
+            </div>
+            <div className="grid gap-2">
+              <DetailRow label="Description" value={carDraft.description.trim() || "Not added"} />
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <div>
                   <p className="text-sm font-semibold text-black">Car documents</p>
                   <p className="text-sm text-gray-600">
@@ -1448,15 +1838,12 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                       : "No car docs uploaded yet"}
                   </p>
                 </div>
-              </div>
+                <div className="grid gap-4">
+                  {carDocumentGroups.map((group) => {
+                    const documents = carDocs[group.docType] ?? [];
 
-              <div className="grid gap-4">
-                {carDocumentGroups.map((group) => {
-                  const documents = carDocs[group.docType] ?? [];
-
-                  return (
-                    <div key={group.docType} className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4">
-                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    return (
+                      <div key={group.docType} className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4">
                         <div>
                           <p className="text-sm font-semibold text-black">{group.label}</p>
                           <p className="text-sm text-gray-600">
@@ -1465,62 +1852,35 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                               : group.emptyText}
                           </p>
                         </div>
-                        <UploadPicker
-                          listingId={file.id}
-                          buttonLabel={`Upload ${group.label}`}
-                          docType={group.docType}
-                          accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx"
-                          onSuccess={(result) => {
-                            if (result.success && result.documentId && result.fileUrl) {
-                              setCarDocs((current) => ({
-                                ...current,
-                                [group.docType]: [
-                                  ...(current[group.docType] ?? []),
-                                  {
-                                    id: result.documentId!,
-                                    listingId: file.id,
-                                    docType: result.docType || group.docType,
-                                    fileUrl: result.fileUrl!,
-                                    notes: result.notes || null,
-                                  },
-                                ],
-                              }));
-                            }
-                          }}
-                        />
+                        {documents.length ? (
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            {documents.map((document) => (
+                              <SellerDocCard
+                                key={document.id}
+                                document={document}
+                                listingId={file.id}
+                                onRemove={(documentId) =>
+                                  setCarDocs((current) => ({
+                                    ...current,
+                                    [group.docType]: (current[group.docType] ?? []).filter(
+                                      (entry) => entry.id !== documentId,
+                                    ),
+                                  }))
+                                }
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+                            {group.emptyText}
+                          </div>
+                        )}
                       </div>
-
-                      {documents.length ? (
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          {documents.map((document) => (
-                            <SellerDocCard
-                              key={document.id}
-                              document={document}
-                              listingId={file.id}
-                              onRemove={(documentId) =>
-                                setCarDocs((current) => ({
-                                  ...current,
-                                  [group.docType]: (current[group.docType] ?? []).filter(
-                                    (entry) => entry.id !== documentId,
-                                  ),
-                                }))
-                              }
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-gray-600">
-                          {group.emptyText}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-
-            <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <div>
                   <p className="text-sm font-semibold text-black">Car photos</p>
                   <p className="text-sm text-gray-600">
@@ -1529,66 +1889,38 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                       : "No car photos uploaded yet"}
                   </p>
                 </div>
-                <ApiUploadPicker
-                  listingId={file.id}
-                  buttonLabel="Upload Car Photos"
-                  accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
-                  multiple
-                  onSuccess={(result) => {
-                    if (result.success && result.images?.length) {
-                      if (!coverImageUrl && result.images[0]?.imageUrl) {
-                        setCoverImageUrl(result.images[0].imageUrl);
-                      }
-                      setCarPhotos((current) => [...current, ...result.images!]);
-                    }
-                  }}
-                />
+                {carPhotos.length ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {carPhotos.map((image) => (
+                      <PhotoCard
+                        key={image.id}
+                        image={image}
+                        listingId={file.id}
+                        isCover={coverImageUrl === image.imageUrl}
+                        onSetCover={(_, imageUrl) => setCoverImageUrl(imageUrl)}
+                        onRemove={(imageId) =>
+                          setCarPhotos((current) => {
+                            const next = current.filter((entry) => entry.id !== imageId);
+                            const nextCover =
+                              next.find((entry) => entry.imageUrl === coverImageUrl)?.imageUrl ??
+                              next[0]?.imageUrl ??
+                              "";
+                            setCoverImageUrl(nextCover);
+                            return next;
+                          })
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-5 text-sm text-gray-600">
+                    No car photos uploaded yet
+                  </div>
+                )}
               </div>
-
-              {carPhotos.length ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {carPhotos.map((image) => (
-                    <PhotoCard
-                      key={image.id}
-                      image={image}
-                      listingId={file.id}
-                      isCover={coverImageUrl === image.imageUrl}
-                      onSetCover={(_, imageUrl) => setCoverImageUrl(imageUrl)}
-                      onRemove={(imageId) =>
-                        setCarPhotos((current) => {
-                          const next = current.filter((entry) => entry.id !== imageId);
-                          const nextCover =
-                            next.find((entry) => entry.imageUrl === coverImageUrl)?.imageUrl ??
-                            next[0]?.imageUrl ??
-                            "";
-                          setCoverImageUrl(nextCover);
-                          return next;
-                        })
-                      }
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-sm text-gray-600">
-                  No car photos uploaded yet
-                </div>
-              )}
             </div>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <button type="submit" className="admin-btn h-12 px-5 text-base">
-              Save Car
-            </button>
-            <button
-              type="button"
-              className="admin-btn h-12 px-5 text-base"
-              onClick={() => setActiveStep(showBuyerStep ? "buyer" : "seller")}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+          </SectionView>
+        )}
       </StepShell>
 
       {showBuyerStep ? (
@@ -1596,7 +1928,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
           icon={<IndianRupee className="h-5 w-5" />}
           title="Step 3 — Buyer"
           emptyText={buyerDone ? "Buyer details are saved." : "No buyer added"}
-          actionLabel={buyerDone ? "Edit Buyer" : "+ Add Buyer"}
+          actionLabel={buyerDone ? "Saved" : "+ Add Buyer"}
           isOpen={activeStep === "buyer"}
           onToggle={() => setActiveStep("buyer")}
           summary={
@@ -1611,51 +1943,167 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
             </>
           }
         >
-          <form action={updateBuyerInfoAction} className="grid gap-4">
-            <input type="hidden" name="listingId" value={file.id} />
-            <input type="hidden" name="buyerAddress" value={buyerFields.address} />
-            <input type="hidden" name="buyerNotes" value={buyerFields.notes} />
-            <input type="hidden" name="saleDate" value={file.listing.buyer?.saleDate ?? ""} />
+          {isBuyerEditing ? (
+            <form action={updateBuyerInfoAction} className="grid gap-4">
+              <input type="hidden" name="listingId" value={file.id} />
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <label>
-                <span className="mb-2 block text-sm font-semibold text-gray-800">Buyer Name</span>
-                <input
-                  className="admin-field h-12"
-                  name="buyerName"
-                  value={buyerDraft.name}
-                  onChange={(event) =>
-                    setBuyerDraft((current) => ({ ...current, name: event.target.value }))
-                  }
-                />
-              </label>
-              <label>
-                <span className="mb-2 block text-sm font-semibold text-gray-800">Phone</span>
-                <input
-                  className="admin-field h-12"
-                  name="buyerPhone"
-                  value={buyerDraft.phone}
-                  onChange={(event) =>
-                    setBuyerDraft((current) => ({ ...current, phone: event.target.value }))
-                  }
-                />
-              </label>
-              <label>
-                <span className="mb-2 block text-sm font-semibold text-gray-800">Sold Price</span>
-                <input
-                  className="admin-field h-12"
-                  type="number"
-                  name="soldPrice"
-                  value={buyerDraft.soldPrice}
-                  onChange={(event) =>
-                    setBuyerDraft((current) => ({ ...current, soldPrice: event.target.value }))
-                  }
-                />
-              </label>
-            </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label>
+                  <span className="mb-2 block text-sm font-semibold text-gray-800">Buyer Name</span>
+                  <input
+                    className="admin-field h-12"
+                    name="buyerName"
+                    value={buyerDraft.name}
+                    onChange={(event) =>
+                      setBuyerDraft((current) => ({ ...current, name: event.target.value }))
+                    }
+                  />
+                </label>
+                <label>
+                  <span className="mb-2 block text-sm font-semibold text-gray-800">Phone</span>
+                  <input
+                    className="admin-field h-12"
+                    name="buyerPhone"
+                    value={buyerDraft.phone}
+                    onChange={(event) =>
+                      setBuyerDraft((current) => ({ ...current, phone: event.target.value }))
+                    }
+                  />
+                </label>
+                <label>
+                  <span className="mb-2 block text-sm font-semibold text-gray-800">Sold Price</span>
+                  <input
+                    className="admin-field h-12"
+                    type="number"
+                    name="soldPrice"
+                    value={buyerDraft.soldPrice}
+                    onChange={(event) =>
+                      setBuyerDraft((current) => ({ ...current, soldPrice: event.target.value }))
+                    }
+                  />
+                </label>
+                <label>
+                  <span className="mb-2 block text-sm font-semibold text-gray-800">Sale Date</span>
+                  <input
+                    className="admin-field h-12"
+                    type="date"
+                    name="saleDate"
+                    value={buyerDraft.saleDate}
+                    onChange={(event) =>
+                      setBuyerDraft((current) => ({ ...current, saleDate: event.target.value }))
+                    }
+                  />
+                </label>
+                <label className="md:col-span-2">
+                  <span className="mb-2 block text-sm font-semibold text-gray-800">Address</span>
+                  <input
+                    className="admin-field h-12"
+                    name="buyerAddress"
+                    value={buyerDraft.address}
+                    onChange={(event) =>
+                      setBuyerDraft((current) => ({ ...current, address: event.target.value }))
+                    }
+                  />
+                </label>
+                <label className="md:col-span-2">
+                  <span className="mb-2 block text-sm font-semibold text-gray-800">Notes</span>
+                  <textarea
+                    className="admin-field min-h-[110px]"
+                    name="buyerNotes"
+                    value={buyerDraft.notes}
+                    onChange={(event) =>
+                      setBuyerDraft((current) => ({ ...current, notes: event.target.value }))
+                    }
+                  />
+                </label>
+              </div>
 
-            <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-black">Buyer documents</p>
+                    <p className="text-sm text-gray-600">
+                      {buyerDocs.length
+                        ? `${buyerDocs.length} file${buyerDocs.length > 1 ? "s" : ""} uploaded`
+                        : "No buyer docs uploaded yet"}
+                    </p>
+                  </div>
+                  <UploadPicker
+                    listingId={file.id}
+                    buttonLabel="Upload Buyer Docs"
+                    docType="buyer_id"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx"
+                    onSuccess={(result) => {
+                      if (result.success && result.documentId && result.fileUrl) {
+                        setBuyerDocs((current) => [
+                          ...current,
+                          {
+                            id: result.documentId!,
+                            listingId: file.id,
+                            docType: result.docType || "buyer_id",
+                            fileUrl: result.fileUrl!,
+                            notes: result.notes || null,
+                          },
+                        ]);
+                      }
+                    }}
+                  />
+                </div>
+
+                {buyerDocs.length ? (
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {buyerDocs.map((document) => (
+                      <SellerDocCard
+                        key={document.id}
+                        document={document}
+                        listingId={file.id}
+                        onRemove={(documentId) =>
+                          setBuyerDocs((current) => current.filter((entry) => entry.id !== documentId))
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-sm text-gray-600">
+                    No buyer docs uploaded yet
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button type="submit" className="admin-btn h-11 px-4 text-sm">
+                  Save Buyer
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn h-11 px-4 text-sm"
+                  onClick={() => {
+                    setBuyerDraft(initialBuyerDraft);
+                    setEditingStep(null);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <SectionView
+              title="Buyer info"
+              text="Saved buyer details for this file."
+              onEdit={() => {
+                setActiveStep("buyer");
+                setEditingStep("buyer");
+              }}
+            >
+              <div className="grid gap-2 sm:grid-cols-2">
+                <DetailRow label="Name" value={buyerDraft.name.trim() || "No buyer added"} />
+                <DetailRow label="Phone" value={buyerDraft.phone.trim() || "No buyer added"} />
+                <DetailRow label="Sold Price" value={formatPrice(buyerDraft.soldPrice)} />
+                <DetailRow label="Sale Date" value={buyerDraft.saleDate || "Not added"} />
+                <DetailRow label="Address" value={buyerDraft.address.trim() || "Not added"} />
+                <DetailRow label="Notes" value={buyerDraft.notes.trim() || "Not added"} />
+              </div>
+              <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <div>
                   <p className="text-sm font-semibold text-black">Buyer documents</p>
                   <p className="text-sm text-gray-600">
@@ -1664,61 +2112,27 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                       : "No buyer docs uploaded yet"}
                   </p>
                 </div>
-                <UploadPicker
-                  listingId={file.id}
-                  buttonLabel="Upload Buyer Docs"
-                  docType="buyer_id"
-                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx"
-                  onSuccess={(result) => {
-                    if (result.success && result.documentId && result.fileUrl) {
-                      setBuyerDocs((current) => [
-                        ...current,
-                        {
-                          id: result.documentId!,
-                          listingId: file.id,
-                          docType: result.docType || "buyer_id",
-                          fileUrl: result.fileUrl!,
-                          notes: result.notes || null,
-                        },
-                      ]);
-                    }
-                  }}
-                />
+                {buyerDocs.length ? (
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {buyerDocs.map((document) => (
+                      <SellerDocCard
+                        key={document.id}
+                        document={document}
+                        listingId={file.id}
+                        onRemove={(documentId) =>
+                          setBuyerDocs((current) => current.filter((entry) => entry.id !== documentId))
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-5 text-sm text-gray-600">
+                    No buyer docs uploaded yet
+                  </div>
+                )}
               </div>
-
-              {buyerDocs.length ? (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {buyerDocs.map((document) => (
-                    <SellerDocCard
-                      key={document.id}
-                      document={document}
-                      listingId={file.id}
-                      onRemove={(documentId) =>
-                        setBuyerDocs((current) => current.filter((entry) => entry.id !== documentId))
-                      }
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-sm text-gray-600">
-                  No buyer docs uploaded yet
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <button type="submit" className="admin-btn h-12 px-5 text-base">
-                Save Buyer
-              </button>
-              <button
-                type="button"
-                className="admin-btn h-12 px-5 text-base"
-                onClick={() => setActiveStep("car")}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+            </SectionView>
+          )}
         </StepShell>
       ) : null}
     </div>
