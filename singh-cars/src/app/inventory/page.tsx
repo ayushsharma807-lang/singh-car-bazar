@@ -39,7 +39,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   return (
     <SiteShell currentPath="/inventory">
       <section className="border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[1440px] px-4 py-14 sm:px-6 lg:px-8">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gray-500">
             Inventory
           </p>
@@ -53,7 +53,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
       </section>
 
       <section className="bg-[#fafafa]">
-        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[1440px] px-4 py-10 sm:px-6 lg:px-8">
           <form className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr_auto_auto]">
               <select
@@ -113,13 +113,18 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
             </p>
           </div>
 
-          <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div
+            className="mt-8 grid gap-6"
+            style={{
+              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            }}
+          >
             {listings.length ? (
               listings.map((listing) => (
                 <InventoryCard key={listing.id} listing={listing} />
               ))
             ) : (
-              <div className="md:col-span-2 xl:col-span-3 rounded-3xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center">
+              <div className="rounded-3xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center [grid-column:1/-1]">
                 <h2 className="text-2xl font-semibold text-black">No Matching Cars</h2>
                 <p className="mt-3 text-sm leading-7 text-gray-600">
                   Try a different brand, model, or year to browse the full stock list again.

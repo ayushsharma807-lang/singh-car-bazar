@@ -146,6 +146,12 @@ export function buildListingTitle(listing: Pick<Listing, "year" | "make" | "mode
     .trim();
 }
 
+export function getPrimaryListingImage(
+  listing: Pick<Listing, "coverImageUrl" | "images">,
+) {
+  return listing.coverImageUrl || listing.images[0]?.imageUrl || "";
+}
+
 export function getPublicListingStatus(
   listing: Pick<Listing, "status" | "make" | "model" | "variant" | "year" | "price" | "images" | "coverImageUrl">,
 ) {
