@@ -250,17 +250,55 @@ async function loadImageFromFile(file: File) {
   }
 }
 
+function isHeicPhoto(file: File) {
+  const lowerName = file.name.toLowerCase();
+  const lowerType = file.type.toLowerCase();
+
+  return (
+    lowerType === "image/heic" ||
+    lowerType === "image/heif" ||
+    lowerName.endsWith(".heic") ||
+    lowerName.endsWith(".heif")
+  );
+}
+
+async function convertHeicPhoto(file: File) {
+  const heic2anyModule = await import("heic2any");
+  const heic2any = (heic2anyModule.default ?? heic2anyModule) as (options: {
+    blob: Blob;
+    toType: string;
+    quality?: number;
+  }) => Promise<Blob | Blob[]>;
+  const converted = await heic2any({
+    blob: file,
+    toType: "image/jpeg",
+    quality: 0.88,
+  });
+  const nextBlob = Array.isArray(converted) ? converted[0] : converted;
+
+  if (!nextBlob) {
+    throw new Error("HEIC photo could not be converted. Please use JPG or PNG.");
+  }
+
+  const nextName = file.name.replace(/\.[^.]+$/, "") || "photo";
+  return new File([nextBlob], `${nextName}.jpg`, {
+    type: "image/jpeg",
+    lastModified: Date.now(),
+  });
+}
+
 async function compressCarPhoto(file: File) {
+  const normalizedFile = isHeicPhoto(file) ? await convertHeicPhoto(file) : file;
   const canCompress = ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(
-    file.type.toLowerCase(),
+    normalizedFile.type.toLowerCase(),
   );
 
   if (!canCompress) {
-    return file;
+    return normalizedFile;
   }
 
   try {
-    const image = await loadImageFromFile(file);
+    const image = await loadImageFromFile(normalizedFile);
     const maxWidth = 1600;
     const scale = Math.min(1, maxWidth / image.width);
     const targetWidth = Math.max(1, Math.round(image.width * scale));
@@ -282,11 +320,11 @@ async function compressCarPhoto(file: File) {
       canvas.toBlob(resolve, "image/jpeg", 0.82);
     });
 
-    if (!blob || blob.size >= file.size) {
-      return file;
+    if (!blob || blob.size >= normalizedFile.size) {
+      return normalizedFile;
     }
 
-    const nextName = file.name.replace(/\.[^.]+$/, "") || "photo";
+    const nextName = normalizedFile.name.replace(/\.[^.]+$/, "") || "photo";
 
     return new File([blob], `${nextName}.jpg`, {
       type: "image/jpeg",
@@ -294,7 +332,7 @@ async function compressCarPhoto(file: File) {
     });
   } catch (error) {
     console.error("Photo compression failed", error);
-    return file;
+    return normalizedFile;
   }
 }
 
@@ -604,26 +642,56 @@ function ApiUploadPicker({
                   continue;
                 }
 
-                setFeedback({
-                  tone: "idle",
-                  message: `Uploading ${index + 1} of ${queuedItems.length}...`,
-                });
+                try {
+                  setFeedback({
+                    tone: "idle",
+                    message: `Uploading ${index + 1} of ${queuedItems.length}...`,
+                  });
 
-                setQueue((current) =>
-                  updateQueueItem(current, queueItem.id, {
-                    status: "uploading",
-                    message: "Compressing and uploading...",
-                  }),
-                );
+                  setQueue((current) =>
+                    updateQueueItem(current, queueItem.id, {
+                      status: "uploading",
+                      message: isHeicPhoto(file)
+                        ? "Converting and uploading..."
+                        : "Compressing and uploading...",
+                    }),
+                  );
 
-                const compressedFile = await compressCarPhoto(file);
-                const payload = new FormData();
-                payload.append("listingId", listingId);
-                payload.append("images", compressedFile);
-                const result = await uploadListingImagesInlineAction(payload);
+                  const compressedFile = await compressCarPhoto(file);
+                  const payload = new FormData();
+                  payload.append("listingId", listingId);
+                  payload.append("images", compressedFile);
+                  const result = await uploadListingImagesInlineAction(payload);
 
-                if (!result.success || !result.images?.length) {
-                  const message = result.message || "Photo upload failed.";
+                  if (!result.success || !result.images?.length) {
+                    const message = result.message || "Photo upload failed.";
+                    setQueue((current) =>
+                      updateQueueItem(current, queueItem.id, {
+                        status: "error",
+                        message,
+                      }),
+                    );
+                    failedCount += 1;
+                    continue;
+                  }
+
+                  uploadedImages.push(...result.images);
+                  setQueue((current) =>
+                    updateQueueItem(current, queueItem.id, {
+                      status: "success",
+                      message:
+                        compressedFile.size < file.size
+                          ? `Uploaded (${formatFileSize(file.size)} -> ${formatFileSize(compressedFile.size)})`
+                          : "Uploaded",
+                    }),
+                  );
+                } catch (error) {
+                  const message = getFriendlyUploadError(error);
+                  console.error("Car photo conversion/upload failed", {
+                    listingId,
+                    fileName: file.name,
+                    error,
+                  });
                   setQueue((current) =>
                     updateQueueItem(current, queueItem.id, {
                       status: "error",
@@ -631,19 +699,7 @@ function ApiUploadPicker({
                     }),
                   );
                   failedCount += 1;
-                  continue;
                 }
-
-                uploadedImages.push(...result.images);
-                setQueue((current) =>
-                  updateQueueItem(current, queueItem.id, {
-                    status: "success",
-                    message:
-                      compressedFile.size < file.size
-                        ? `Uploaded (${formatFileSize(file.size)} -> ${formatFileSize(compressedFile.size)})`
-                        : "Uploaded",
-                  }),
-                );
               }
 
               if (!uploadedImages.length) {
