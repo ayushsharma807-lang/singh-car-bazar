@@ -77,6 +77,7 @@ export type Inquiry = {
 export type InventoryFilters = {
   search?: string;
   brand?: string;
+  model?: string;
   fuel?: string;
   transmission?: string;
   year?: string;

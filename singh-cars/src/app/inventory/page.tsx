@@ -12,115 +12,137 @@ type InventoryPageProps = {
 export default async function InventoryPage({ searchParams }: InventoryPageProps) {
   const params = await searchParams;
   const filters: InventoryFilters = {
-    search: typeof params.search === "string" ? params.search : undefined,
     brand: typeof params.brand === "string" ? params.brand : undefined,
+    model: typeof params.model === "string" ? params.model : undefined,
     fuel: typeof params.fuel === "string" ? params.fuel : undefined,
     transmission:
       typeof params.transmission === "string" ? params.transmission : undefined,
     year: typeof params.year === "string" ? params.year : undefined,
     price: typeof params.price === "string" ? params.price : undefined,
   };
-  const listings = await getListings(filters);
+  const [allListings, listings] = await Promise.all([getListings(), getListings(filters)]);
+
+  const brandOptions = Array.from(new Set(allListings.map((listing) => listing.make))).sort();
+  const modelOptions = Array.from(
+    new Set(
+      allListings
+        .filter((listing) =>
+          filters.brand ? listing.make.toLowerCase() === filters.brand.toLowerCase() : true,
+        )
+        .map((listing) => listing.model),
+    ),
+  ).sort();
+  const yearOptions = Array.from(new Set(allListings.map((listing) => listing.year)))
+    .sort((left, right) => right - left)
+    .map(String);
 
   return (
     <SiteShell currentPath="/inventory">
-      <section className="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#eef4ff_100%)]">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-4xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.34em] text-[#ff8a2e]">
-                Inventory
-              </p>
-              <h1 className="mt-3 font-display text-5xl uppercase tracking-[0.08em] text-slate-900 sm:text-6xl">
-                Available Cars
-              </h1>
-              <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600">
-                Browse live stock, search quickly, and shortlist the right used car without scrolling through unnecessary content.
-              </p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3 xl:min-w-[440px]">
-              <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                  Cars Showing
-                </p>
-                <p className="mt-3 font-display text-4xl uppercase tracking-[0.08em] text-[#2252e8]">
-                  {formatNumber(listings.length)}
-                </p>
-              </div>
-              <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                  Buying Help
-                </p>
-                <p className="mt-3 text-sm leading-7 text-slate-600">
-                  Call or WhatsApp for quick assistance.
-                </p>
-              </div>
-              <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                  Fast Contact
-                </p>
-                <Link href="/contact" className="mt-3 inline-flex text-sm font-semibold text-[#2252e8] hover:underline">
-                  Send Inquiry
-                </Link>
-              </div>
-            </div>
-          </div>
+      <section className="border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gray-500">
+            Inventory
+          </p>
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-black sm:text-5xl">
+            Available Cars
+          </h1>
+          <p className="mt-4 max-w-3xl text-base leading-7 text-gray-600">
+            Browse live available cars in a clean, easy-to-scan stock list and open any vehicle for full details.
+          </p>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <form className="grid gap-4 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-2 xl:grid-cols-[1.4fr_repeat(5,1fr)]">
-          <input className="field" name="search" placeholder="Search make or model" defaultValue={filters.search ?? ""} />
-          <input className="field" name="brand" placeholder="Brand" defaultValue={filters.brand ?? ""} />
-          <input className="field" name="fuel" placeholder="Fuel" defaultValue={filters.fuel ?? ""} />
-          <input className="field" name="transmission" placeholder="Transmission" defaultValue={filters.transmission ?? ""} />
-          <input className="field" name="year" placeholder="Year" defaultValue={filters.year ?? ""} />
-          <input className="field" name="price" placeholder="Max Price" defaultValue={filters.price ?? ""} />
-          <div className="flex flex-wrap gap-3 md:col-span-2 xl:col-span-6">
-            <button className="rounded-full bg-[#2252e8] px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-[#173bb0]">
-              Search Cars
-            </button>
-            <Link
-              href="/inventory"
-              className="rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-slate-800 transition hover:border-[#2252e8] hover:text-[#2252e8]"
-            >
-              Reset Filters
-            </Link>
-          </div>
-        </form>
+      <section className="bg-[#fafafa]">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+          <form className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr_auto_auto]">
+              <select
+                name="brand"
+                defaultValue={filters.brand ?? ""}
+                className="h-12 rounded-2xl border border-gray-300 bg-white px-4 text-sm text-black outline-none"
+              >
+                <option value="">All Brands</option>
+                {brandOptions.map((brand) => (
+                  <option key={brand} value={brand}>
+                    {brand}
+                  </option>
+                ))}
+              </select>
+              <select
+                name="model"
+                defaultValue={filters.model ?? ""}
+                className="h-12 rounded-2xl border border-gray-300 bg-white px-4 text-sm text-black outline-none"
+              >
+                <option value="">All Models</option>
+                {modelOptions.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+              <select
+                name="year"
+                defaultValue={filters.year ?? ""}
+                className="h-12 rounded-2xl border border-gray-300 bg-white px-4 text-sm text-black outline-none"
+              >
+                <option value="">All Years</option>
+                {yearOptions.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+              <button className="h-12 rounded-2xl bg-black px-6 text-sm font-semibold text-white transition hover:bg-gray-800">
+                Search
+              </button>
+              <Link
+                href="/inventory"
+                className="inline-flex h-12 items-center justify-center rounded-2xl border border-gray-300 bg-white px-6 text-sm font-semibold text-black transition hover:bg-gray-50"
+              >
+                Reset
+              </Link>
+            </div>
+          </form>
 
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
-            {listings.length ? `${formatNumber(listings.length)} cars found` : "No cars found"}
-          </p>
-          <p className="text-sm text-slate-600">
-            Inventory is updated from the live dealer system.
-          </p>
-        </div>
-
-        {listings.length ? (
-          <div className="mt-8 grid gap-6 xl:grid-cols-3">
-            {listings.map((listing) => (
-              <InventoryCard key={listing.id} listing={listing} />
-            ))}
-          </div>
-        ) : (
-          <div className="mt-8 rounded-[28px] border border-dashed border-slate-300 bg-white px-6 py-12 text-center shadow-sm">
-            <h2 className="font-display text-3xl uppercase tracking-[0.08em] text-slate-900">
-              No Matching Cars
-            </h2>
-            <p className="mt-4 text-base leading-7 text-slate-600">
-              Try a different brand, year, fuel type, or reset the filters to see all available cars.
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-medium text-gray-600">
+              {listings.length ? `${formatNumber(listings.length)} cars found` : "No cars found"}
             </p>
+            <p className="text-sm text-gray-500">
+              Live stock from Singh Car Bazar dealer inventory.
+            </p>
+          </div>
+
+          <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {listings.length ? (
+              listings.map((listing) => (
+                <InventoryCard key={listing.id} listing={listing} />
+              ))
+            ) : (
+              <div className="md:col-span-2 xl:col-span-3 rounded-3xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center">
+                <h2 className="text-2xl font-semibold text-black">No Matching Cars</h2>
+                <p className="mt-3 text-sm leading-7 text-gray-600">
+                  Try a different brand, model, or year to browse the full stock list again.
+                </p>
+                <Link
+                  href="/inventory"
+                  className="mt-6 inline-flex rounded-2xl bg-black px-6 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+                >
+                  Show All Cars
+                </Link>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-10 flex justify-center">
             <Link
-              href="/inventory"
-              className="mt-6 inline-flex rounded-full bg-[#2252e8] px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-[#173bb0]"
+              href="/contact"
+              className="inline-flex rounded-2xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-gray-50"
             >
-              Show All Cars
+              Need Help Finding a Car?
             </Link>
           </div>
-        )}
+        </div>
       </section>
     </SiteShell>
   );

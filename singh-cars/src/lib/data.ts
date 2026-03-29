@@ -150,6 +150,10 @@ function applyInventoryFilters(listings: Listing[], filters: InventoryFilters) {
       return false;
     }
 
+    if (filters.model && listing.model.toLowerCase() !== filters.model.toLowerCase()) {
+      return false;
+    }
+
     if (filters.fuel && listing.fuel.toLowerCase() !== filters.fuel.toLowerCase()) {
       return false;
     }
@@ -213,6 +217,10 @@ async function fetchListingsFromSupabase({
 
   if (filters.brand) {
     query = query.ilike("make", filters.brand);
+  }
+
+  if (filters.model) {
+    query = query.ilike("model", filters.model);
   }
 
   if (filters.fuel) {
