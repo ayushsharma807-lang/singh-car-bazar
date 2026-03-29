@@ -7,12 +7,22 @@ import { getAdminFileById, getPublicListingChecklist } from "@/lib/data";
 
 type AdminFileDetailPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ saved?: string }>;
+};
+
+const saveMessages: Record<string, string> = {
+  seller: "Seller details saved.",
+  car: "Car details saved.",
+  buyer: "Buyer details saved.",
+  status: "Car status updated.",
 };
 
 export default async function AdminFileDetailPage({
   params,
+  searchParams,
 }: AdminFileDetailPageProps) {
   const { id } = await params;
+  const { saved } = await searchParams;
   const file = await getAdminFileById(id);
 
   if (!file) {
@@ -22,6 +32,12 @@ export default async function AdminFileDetailPage({
   return (
     <AdminShell>
       <div className="grid gap-5">
+        {saved && saveMessages[saved] ? (
+          <section className="rounded-xl border border-green-200 bg-green-50 px-6 py-4 text-sm font-semibold text-green-800 shadow-sm">
+            {saveMessages[saved]}
+          </section>
+        ) : null}
+
         <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>

@@ -41,6 +41,7 @@ async function uploadFile(bucket: string, path: string, file: File) {
 
 async function ensureStorageBucket(bucket: string) {
   const supabase = createSupabaseAdminClient();
+  const shouldBePublic = bucket === "listing-photos" || bucket === "documents";
 
   if (!supabase) {
     return {
@@ -52,6 +53,19 @@ async function ensureStorageBucket(bucket: string) {
   const { data: existingBucket } = await supabase.storage.getBucket(bucket);
 
   if (existingBucket) {
+    if (shouldBePublic && !existingBucket.public) {
+      const { error: updateError } = await supabase.storage.updateBucket(bucket, {
+        public: true,
+      });
+
+      if (updateError) {
+        return {
+          ok: false,
+          error: updateError.message,
+        };
+      }
+    }
+
     return {
       ok: true,
       error: null,
@@ -59,7 +73,7 @@ async function ensureStorageBucket(bucket: string) {
   }
 
   const { error } = await supabase.storage.createBucket(bucket, {
-    public: bucket === "listing-photos" || bucket === "documents",
+    public: shouldBePublic,
   });
 
   if (error) {
@@ -246,9 +260,9 @@ async function revalidateAdminFilePaths(listingId: string) {
   revalidatePath(`/admin/files/${listingId}/edit`);
 }
 
-async function redirectToAdminFile(listingId: string) {
+async function redirectToAdminFile(listingId: string, saved?: "seller" | "car" | "buyer" | "status") {
   await revalidateAdminFilePaths(listingId);
-  redirect(`/admin/files/${listingId}`);
+  redirect(saved ? `/admin/files/${listingId}?saved=${saved}` : `/admin/files/${listingId}`);
 }
 
 export async function submitInquiryAction(
@@ -590,7 +604,7 @@ export async function updateSellerInfoAction(formData: FormData) {
     throw new Error(`Seller save failed: ${error.message}`);
   }
 
-  await redirectToAdminFile(listingId);
+  await redirectToAdminFile(listingId, "seller");
 }
 
 export async function updateCarInfoAction(formData: FormData) {
@@ -673,7 +687,7 @@ export async function updateCarInfoAction(formData: FormData) {
     throw new Error(`Car save failed: ${error.message}`);
   }
 
-  await redirectToAdminFile(listingId);
+  await redirectToAdminFile(listingId, "car");
 }
 
 export async function markListingSoldAction(formData: FormData) {
@@ -697,7 +711,7 @@ export async function markListingSoldAction(formData: FormData) {
     })
     .eq("id", listingId);
 
-  await redirectToAdminFile(listingId);
+  await redirectToAdminFile(listingId, "status");
 }
 
 export async function updateBuyerInfoAction(formData: FormData) {
@@ -738,7 +752,7 @@ export async function updateBuyerInfoAction(formData: FormData) {
     }
   }
 
-  await redirectToAdminFile(listingId);
+  await redirectToAdminFile(listingId, "buyer");
 }
 
 export async function uploadListingImagesAction(formData: FormData) {

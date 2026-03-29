@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 async function ensureStorageBucket(bucket: string) {
   const supabase = createSupabaseAdminClient();
+  const shouldBePublic = true;
 
   if (!supabase) {
     return {
@@ -17,6 +18,19 @@ async function ensureStorageBucket(bucket: string) {
   const { data: existingBucket } = await supabase.storage.getBucket(bucket);
 
   if (existingBucket) {
+    if (!existingBucket.public) {
+      const { error: updateError } = await supabase.storage.updateBucket(bucket, {
+        public: shouldBePublic,
+      });
+
+      if (updateError) {
+        return {
+          ok: false,
+          error: updateError.message,
+        };
+      }
+    }
+
     return {
       ok: true,
       error: null,
@@ -24,7 +38,7 @@ async function ensureStorageBucket(bucket: string) {
   }
 
   const { error } = await supabase.storage.createBucket(bucket, {
-    public: true,
+    public: shouldBePublic,
   });
 
   if (error) {

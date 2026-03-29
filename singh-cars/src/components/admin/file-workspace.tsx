@@ -992,13 +992,25 @@ function PhotoCard({
 }) {
   const [isPending, startTransition] = useTransition();
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
 
   return (
     <>
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <button type="button" className="block w-full" onClick={() => setPreviewOpen(true)}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image.imageUrl} alt="Car photo" className="h-28 w-full object-cover" />
+          {imageFailed ? (
+            <div className="flex h-28 w-full items-center justify-center bg-gray-50 text-sm font-medium text-gray-500">
+              Photo unavailable
+            </div>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={image.imageUrl}
+              alt="Car photo"
+              className="h-28 w-full object-cover"
+              onError={() => setImageFailed(true)}
+            />
+          )}
         </button>
         <div className="grid gap-3 p-4">
           <div className="flex items-start justify-between gap-3">
@@ -1058,7 +1070,7 @@ function PhotoCard({
           </div>
         </div>
       </div>
-      {previewOpen ? (
+      {previewOpen && !imageFailed ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4">
           <button
             type="button"

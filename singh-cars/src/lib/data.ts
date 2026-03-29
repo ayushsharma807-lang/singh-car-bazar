@@ -139,6 +139,28 @@ function mapListing(row: ListingRow): Listing {
   };
 }
 
+async function ensureAdminBucketIsPublic(bucket: string) {
+  const supabase = createSupabaseAdminClient();
+
+  if (!supabase) {
+    return;
+  }
+
+  const { data: existingBucket, error } = await supabase.storage.getBucket(bucket);
+
+  if (error || !existingBucket || existingBucket.public) {
+    return;
+  }
+
+  const { error: updateError } = await supabase.storage.updateBucket(bucket, {
+    public: true,
+  });
+
+  if (updateError) {
+    console.error(`Could not make ${bucket} public`, updateError);
+  }
+}
+
 export function buildListingTitle(listing: Pick<Listing, "year" | "make" | "model" | "variant">) {
   return [listing.year, listing.make, listing.model, listing.variant]
     .filter((value) => value && String(value).trim())
@@ -277,6 +299,11 @@ async function fetchListingsFromSupabase({
     }
 
     return null;
+  }
+
+  if (admin) {
+    await ensureAdminBucketIsPublic("listing-photos");
+    await ensureAdminBucketIsPublic("documents");
   }
 
   let query = supabase
