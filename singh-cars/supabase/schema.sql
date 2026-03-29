@@ -34,6 +34,9 @@ create table if not exists public.listings (
   cover_image_url text
 );
 
+alter table public.listings
+alter column status set default 'available';
+
 drop trigger if exists set_listings_updated_at on public.listings;
 create trigger set_listings_updated_at
 before update on public.listings

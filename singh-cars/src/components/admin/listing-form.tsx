@@ -96,6 +96,7 @@ export function ListingForm({ listing }: ListingFormProps) {
   const [step, setStep] = useState<Step>("seller");
   const coverImageUrl = listing?.coverImageUrl ?? "";
   const isEditing = Boolean(listing);
+  const defaultStatus = listing?.status ?? "available";
 
   return (
     <form
@@ -103,6 +104,7 @@ export function ListingForm({ listing }: ListingFormProps) {
       className="grid gap-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm lg:p-6"
     >
       <input type="hidden" name="listingId" value={listing?.id ?? ""} />
+      <input type="hidden" name="status" value={defaultStatus} />
 
       <div className="grid gap-3 md:grid-cols-3">
         {stepOrder.map((stepKey) => (
@@ -264,14 +266,16 @@ export function ListingForm({ listing }: ListingFormProps) {
                   placeholder="Extra notes about the car"
                 />
               </label>
-              <label>
-                <FieldLabel>Car Status</FieldLabel>
-                <select className="admin-field h-14" name="status" defaultValue={listing?.status ?? "available"}>
-                  <option value="available">In Stock</option>
-                  <option value="booked">Booked</option>
-                  <option value="sold">Sold</option>
-                </select>
-              </label>
+              {isEditing ? (
+                <label>
+                  <FieldLabel>Car Status</FieldLabel>
+                  <select className="admin-field h-14" name="status" defaultValue={defaultStatus}>
+                    <option value="available">In Stock</option>
+                    <option value="booked">Booked</option>
+                    <option value="sold">Sold</option>
+                  </select>
+                </label>
+              ) : null}
               <label className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-4 text-sm font-medium text-gray-800">
                 <input type="checkbox" name="featured" defaultChecked={listing?.featured ?? false} />
                 Show in featured cars

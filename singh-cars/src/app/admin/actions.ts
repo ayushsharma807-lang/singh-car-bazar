@@ -207,6 +207,7 @@ export async function saveListingAction(formData: FormData) {
     .getAll("images")
     .filter((entry): entry is File => entry instanceof File && entry.size > 0);
   const existingCoverImage = String(formData.get("coverImageUrl") || "") || null;
+  const status = String(formData.get("status") || "").trim() || "available";
 
   let coverImageUrl = existingCoverImage;
 
@@ -251,7 +252,7 @@ export async function saveListingAction(formData: FormData) {
     location: String(formData.get("location") || ""),
     description: String(formData.get("description") || "") || null,
     seller_type: String(formData.get("sellerType") || "dealer"),
-    status: String(formData.get("status") || "available"),
+    status,
     featured: formData.get("featured") === "on",
     cover_image_url: coverImageUrl,
   });
@@ -353,6 +354,8 @@ export async function updateCarInfoAction(formData: FormData) {
     throw new Error("Unable to update car info.");
   }
 
+  const status = String(formData.get("status") || "").trim() || "available";
+
   await supabase.from("listings").update({
     stock_number: String(formData.get("stockNumber") || ""),
     make: String(formData.get("make") || ""),
@@ -367,7 +370,7 @@ export async function updateCarInfoAction(formData: FormData) {
     color: String(formData.get("color") || "") || null,
     location: String(formData.get("location") || ""),
     description: String(formData.get("description") || "") || null,
-    status: String(formData.get("status") || "available"),
+    status,
   }).eq("id", listingId);
 
   await redirectToAdminFile(listingId);
