@@ -102,7 +102,7 @@ function getStoragePath(url: string, bucket: string) {
   return null;
 }
 
-async function getSignedStorageUrl(url: string | null, bucket: string) {
+function getAppStorageUrl(url: string | null, bucket: string) {
   if (!url) {
     return url;
   }
@@ -113,21 +113,7 @@ async function getSignedStorageUrl(url: string | null, bucket: string) {
     return url;
   }
 
-  const supabase = createSupabaseAdminClient();
-
-  if (!supabase) {
-    return url;
-  }
-
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
-
-  if (error || !data?.signedUrl) {
-    return url;
-  }
-
-  return data.signedUrl;
+  return `/api/storage-file?bucket=${encodeURIComponent(bucket)}&path=${encodeURIComponent(storagePath)}`;
 }
 
 function mapListing(row: ListingRow): Listing {
@@ -218,24 +204,17 @@ async function ensureAdminBucketIsPublic(bucket: string) {
 }
 
 async function enrichListingUrls(listing: Listing) {
-  const signedCoverImageUrl = await getSignedStorageUrl(
-    listing.coverImageUrl ?? null,
-    "listing-photos",
-  );
+  const signedCoverImageUrl = getAppStorageUrl(listing.coverImageUrl ?? null, "listing-photos");
 
-  const signedImages = await Promise.all(
-    listing.images.map(async (image) => ({
-      ...image,
-      imageUrl: (await getSignedStorageUrl(image.imageUrl, "listing-photos")) || image.imageUrl,
-    })),
-  );
+  const signedImages = listing.images.map((image) => ({
+    ...image,
+    imageUrl: getAppStorageUrl(image.imageUrl, "listing-photos") || image.imageUrl,
+  }));
 
-  const signedDocuments = await Promise.all(
-    listing.documents.map(async (document) => ({
-      ...document,
-      fileUrl: (await getSignedStorageUrl(document.fileUrl, "documents")) || document.fileUrl,
-    })),
-  );
+  const signedDocuments = listing.documents.map((document) => ({
+    ...document,
+    fileUrl: getAppStorageUrl(document.fileUrl, "documents") || document.fileUrl,
+  }));
 
   return {
     ...listing,
