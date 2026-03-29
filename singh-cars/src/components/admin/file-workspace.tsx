@@ -1400,13 +1400,35 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
               <DetailRow label="Notes" value={sellerDraft.notes.trim() || "Not added"} />
             </div>
             <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <div>
-                <p className="text-sm font-semibold text-black">Seller documents</p>
-                <p className="text-sm text-gray-600">
-                  {sellerDocs.length
-                    ? `${sellerDocs.length} file${sellerDocs.length > 1 ? "s" : ""} uploaded`
-                    : "No seller docs uploaded yet"}
-                </p>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-black">Seller documents</p>
+                  <p className="text-sm text-gray-600">
+                    {sellerDocs.length
+                      ? `${sellerDocs.length} file${sellerDocs.length > 1 ? "s" : ""} uploaded`
+                      : "No seller docs uploaded yet"}
+                  </p>
+                </div>
+                <UploadPicker
+                  listingId={file.id}
+                  buttonLabel={sellerDocs.length ? "Add More Seller Docs" : "Upload Seller Docs"}
+                  docType="seller_id"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx"
+                  onSuccess={(result) => {
+                    if (result.success && result.documentId && result.fileUrl) {
+                      setSellerDocs((current) => [
+                        ...current,
+                        {
+                          id: result.documentId!,
+                          listingId: file.id,
+                          docType: result.docType || "seller_id",
+                          fileUrl: result.fileUrl!,
+                          notes: result.notes || null,
+                        },
+                      ]);
+                    }
+                  }}
+                />
               </div>
               {sellerDocs.length ? (
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -2147,13 +2169,35 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                 <DetailRow label="Notes" value={buyerDraft.notes.trim() || "Not added"} />
               </div>
               <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <div>
-                  <p className="text-sm font-semibold text-black">Buyer documents</p>
-                  <p className="text-sm text-gray-600">
-                    {buyerDocs.length
-                      ? `${buyerDocs.length} file${buyerDocs.length > 1 ? "s" : ""} uploaded`
-                      : "No buyer docs uploaded yet"}
-                  </p>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-black">Buyer documents</p>
+                    <p className="text-sm text-gray-600">
+                      {buyerDocs.length
+                        ? `${buyerDocs.length} file${buyerDocs.length > 1 ? "s" : ""} uploaded`
+                        : "No buyer docs uploaded yet"}
+                    </p>
+                  </div>
+                  <UploadPicker
+                    listingId={file.id}
+                    buttonLabel={buyerDocs.length ? "Add More Buyer Docs" : "Upload Buyer Docs"}
+                    docType="buyer_id"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx"
+                    onSuccess={(result) => {
+                      if (result.success && result.documentId && result.fileUrl) {
+                        setBuyerDocs((current) => [
+                          ...current,
+                          {
+                            id: result.documentId!,
+                            listingId: file.id,
+                            docType: result.docType || "buyer_id",
+                            fileUrl: result.fileUrl!,
+                            notes: result.notes || null,
+                          },
+                        ]);
+                      }
+                    }}
+                  />
                 </div>
                 {buyerDocs.length ? (
                   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
