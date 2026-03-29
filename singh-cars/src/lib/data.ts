@@ -74,6 +74,62 @@ type ListingRow = {
     | null;
 };
 
+function getStoragePath(url: string, bucket: string) {
+  if (!url) {
+    return null;
+  }
+
+  const publicMarker = `/storage/v1/object/public/${bucket}/`;
+  const signMarker = `/storage/v1/object/sign/${bucket}/`;
+
+  try {
+    const parsedUrl = new URL(url);
+    const pathname = parsedUrl.pathname;
+    const publicIndex = pathname.indexOf(publicMarker);
+    const signIndex = pathname.indexOf(signMarker);
+
+    if (publicIndex >= 0) {
+      return decodeURIComponent(pathname.slice(publicIndex + publicMarker.length));
+    }
+
+    if (signIndex >= 0) {
+      return decodeURIComponent(pathname.slice(signIndex + signMarker.length));
+    }
+  } catch {
+    return url;
+  }
+
+  return null;
+}
+
+async function getSignedStorageUrl(url: string | null, bucket: string) {
+  if (!url) {
+    return url;
+  }
+
+  const storagePath = getStoragePath(url, bucket);
+
+  if (!storagePath) {
+    return url;
+  }
+
+  const supabase = createSupabaseAdminClient();
+
+  if (!supabase) {
+    return url;
+  }
+
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+
+  if (error || !data?.signedUrl) {
+    return url;
+  }
+
+  return data.signedUrl;
+}
+
 function mapListing(row: ListingRow): Listing {
   const images =
     row.listing_images?.map((image) => ({
@@ -159,6 +215,34 @@ async function ensureAdminBucketIsPublic(bucket: string) {
   if (updateError) {
     console.error(`Could not make ${bucket} public`, updateError);
   }
+}
+
+async function enrichListingUrls(listing: Listing) {
+  const signedCoverImageUrl = await getSignedStorageUrl(
+    listing.coverImageUrl ?? null,
+    "listing-photos",
+  );
+
+  const signedImages = await Promise.all(
+    listing.images.map(async (image) => ({
+      ...image,
+      imageUrl: (await getSignedStorageUrl(image.imageUrl, "listing-photos")) || image.imageUrl,
+    })),
+  );
+
+  const signedDocuments = await Promise.all(
+    listing.documents.map(async (document) => ({
+      ...document,
+      fileUrl: (await getSignedStorageUrl(document.fileUrl, "documents")) || document.fileUrl,
+    })),
+  );
+
+  return {
+    ...listing,
+    coverImageUrl: signedCoverImageUrl,
+    images: signedImages,
+    documents: signedDocuments,
+  };
 }
 
 export function buildListingTitle(listing: Pick<Listing, "year" | "make" | "model" | "variant">) {
@@ -358,7 +442,8 @@ async function fetchListingsFromSupabase({
     return null;
   }
 
-  return data.map((row) => mapListing(row as ListingRow));
+  const listings = data.map((row) => mapListing(row as ListingRow));
+  return Promise.all(listings.map(enrichListingUrls));
 }
 
 export async function getListings(filters: InventoryFilters = {}) {
