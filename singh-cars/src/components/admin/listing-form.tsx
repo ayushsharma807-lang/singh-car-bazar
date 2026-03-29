@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { saveListingAction } from "@/app/admin/actions";
+import { useActionState, useState } from "react";
+import { saveListingAction, type SaveListingActionState } from "@/app/admin/actions";
 import type { Listing } from "@/types";
 
 type ListingFormProps = {
@@ -97,10 +97,12 @@ export function ListingForm({ listing }: ListingFormProps) {
   const coverImageUrl = listing?.coverImageUrl ?? "";
   const isEditing = Boolean(listing);
   const defaultStatus = listing?.status ?? "available";
+  const initialState: SaveListingActionState = { status: "idle" };
+  const [state, formAction, isPending] = useActionState(saveListingAction, initialState);
 
   return (
     <form
-      action={saveListingAction}
+      action={formAction}
       className="grid gap-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm lg:p-6"
     >
       <input type="hidden" name="listingId" value={listing?.id ?? ""} />
@@ -233,12 +235,11 @@ export function ListingForm({ listing }: ListingFormProps) {
                   name="stockNumber"
                   defaultValue={listing?.stockNumber ?? ""}
                   placeholder="Office file number"
-                  required
                 />
               </label>
               <label>
                 <FieldLabel>Location</FieldLabel>
-                <input className="admin-field h-14" name="location" defaultValue={listing?.location ?? ""} placeholder="Location" required />
+                <input className="admin-field h-14" name="location" defaultValue={listing?.location ?? ""} placeholder="Location" />
               </label>
               <label>
                 <FieldLabel>Color</FieldLabel>
@@ -350,10 +351,14 @@ export function ListingForm({ listing }: ListingFormProps) {
           </details>
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+            {state.message ? (
+              <p className="text-sm text-red-600">{state.message}</p>
+            ) : <span />}
             <button
               type="button"
               onClick={() => setStep("car")}
               className="admin-btn"
+              disabled={isPending}
             >
               Back
             </button>
@@ -361,8 +366,9 @@ export function ListingForm({ listing }: ListingFormProps) {
               <button
                 type="submit"
                 className="admin-btn"
+                disabled={isPending}
               >
-                {isEditing ? "Save Changes" : "Save Car"}
+                {isPending ? "Saving..." : isEditing ? "Save Changes" : "Save Car"}
               </button>
             </div>
           </div>

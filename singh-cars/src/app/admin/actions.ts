@@ -11,6 +11,11 @@ export type InquiryActionState = {
   message?: string;
 };
 
+export type SaveListingActionState = {
+  status: "idle" | "error";
+  message?: string;
+};
+
 async function requireAdminSession() {
   const supabase = await createServerSupabaseClient();
 
@@ -221,13 +226,19 @@ export async function adminSignOutAction() {
   redirect("/admin/login");
 }
 
-export async function saveListingAction(formData: FormData) {
+export async function saveListingAction(
+  _: SaveListingActionState,
+  formData: FormData,
+): Promise<SaveListingActionState> {
   await requireAdminSession();
 
   const supabase = createSupabaseAdminClient();
 
   if (!supabase) {
-    throw new Error("Supabase environment variables are required to save listings.");
+    return {
+      status: "error",
+      message: "Supabase environment variables are required to save listings.",
+    };
   }
 
   const listingId = String(formData.get("listingId") || "") || randomUUID();
@@ -236,78 +247,193 @@ export async function saveListingAction(formData: FormData) {
     .filter((entry): entry is File => entry instanceof File && entry.size > 0);
   const existingCoverImage = String(formData.get("coverImageUrl") || "") || null;
   const status = String(formData.get("status") || "").trim() || "available";
+  const sellerType = String(formData.get("sellerType") || "dealer");
+  const make = String(formData.get("make") || "").trim();
+  const model = String(formData.get("model") || "").trim();
+  const fuel = String(formData.get("fuel") || "").trim();
+  const transmission = String(formData.get("transmission") || "").trim();
+  const numberPlate = String(formData.get("numberPlate") || "").trim();
+  const sellerName = String(formData.get("sellerName") || "").trim();
+  const sellerPhone = String(formData.get("sellerPhone") || "").trim();
+  const year = Number(formData.get("year") || 0);
+  const kmDriven = Number(formData.get("kmDriven") || 0);
+  const price = Number(formData.get("price") || 0);
 
-  let coverImageUrl = existingCoverImage;
-
-  if (uploadedImages.length) {
-    await supabase.from("listing_images").delete().eq("listing_id", listingId);
-
-    for (const [index, image] of uploadedImages.entries()) {
-      const extension = image.name.split(".").pop() || "jpg";
-      const path = `${listingId}/${index + 1}-${randomUUID()}.${extension}`;
-      const publicUrl = await uploadFile("listing-photos", path, image);
-
-      if (!publicUrl) {
-        continue;
-      }
-
-      if (index === 0 && !coverImageUrl) {
-        coverImageUrl = publicUrl;
-      }
-
-      await supabase.from("listing_images").insert({
-        listing_id: listingId,
-        image_url: publicUrl,
-        sort_order: index,
-      });
-    }
+  if (!sellerName || !sellerPhone) {
+    return {
+      status: "error",
+      message: "Please add seller name and phone before saving.",
+    };
   }
 
-  await supabase.from("listings").upsert({
+  if (!make || !model || !numberPlate || !fuel || !transmission || !year) {
+    return {
+      status: "error",
+      message: "Please fill the main car details before saving.",
+    };
+  }
+
+  if (!price && price !== 0) {
+    return {
+      status: "error",
+      message: "Please add the car price before saving.",
+    };
+  }
+
+  const stockNumber =
+    String(formData.get("stockNumber") || "").trim() ||
+    `FILE-${listingId.slice(0, 8).toUpperCase()}`;
+  const location = String(formData.get("location") || "").trim() || "Jalandhar";
+  let coverImageUrl = existingCoverImage;
+
+  const { error: listingError } = await supabase.from("listings").upsert({
     id: listingId,
-    stock_number: String(formData.get("stockNumber") || ""),
-    number_plate: String(formData.get("numberPlate") || ""),
-    make: String(formData.get("make") || ""),
-    model: String(formData.get("model") || ""),
+    stock_number: stockNumber,
+    number_plate: numberPlate,
+    make,
+    model,
     variant: String(formData.get("variant") || "") || null,
-    year: Number(formData.get("year") || 0),
-    fuel: String(formData.get("fuel") || ""),
-    transmission: String(formData.get("transmission") || ""),
-    km_driven: Number(formData.get("kmDriven") || 0),
+    year,
+    fuel,
+    transmission,
+    km_driven: kmDriven,
     color: String(formData.get("color") || "") || null,
     owner_count: Number(formData.get("ownerCount") || 0) || null,
-    price: Number(formData.get("price") || 0),
-    location: String(formData.get("location") || ""),
+    price,
+    location,
     description: String(formData.get("description") || "") || null,
-    seller_type: String(formData.get("sellerType") || "dealer"),
+    seller_type: sellerType,
     status,
     featured: formData.get("featured") === "on",
     cover_image_url: coverImageUrl,
   });
 
-  await supabase.from("sellers").upsert({
+  if (listingError) {
+    console.error("Listing save failed", { listingId, listingError });
+    return {
+      status: "error",
+      message: `Car save failed: ${listingError.message}`,
+    };
+  }
+
+  if (uploadedImages.length) {
+    const { data: existingImages } = await supabase
+      .from("listing_images")
+      .select("id,image_url")
+      .eq("listing_id", listingId);
+
+    for (const existingImage of existingImages ?? []) {
+      await deletePublicFile("listing-photos", existingImage.image_url);
+    }
+
+    const { error: deleteImagesError } = await supabase
+      .from("listing_images")
+      .delete()
+      .eq("listing_id", listingId);
+
+    if (deleteImagesError) {
+      console.error("Listing image reset failed", { listingId, deleteImagesError });
+      return {
+        status: "error",
+        message: `Car photos could not be reset: ${deleteImagesError.message}`,
+      };
+    }
+
+    for (const [index, image] of uploadedImages.entries()) {
+      const extension = image.name.split(".").pop() || "jpg";
+      const path = `${listingId}/${index + 1}-${randomUUID()}.${extension}`;
+      const uploadResult = await uploadFileWithResult("listing-photos", path, image);
+
+      if (!uploadResult.publicUrl) {
+        return {
+          status: "error",
+          message: uploadResult.error || "Car photo upload failed.",
+        };
+      }
+
+      if (index === 0) {
+        coverImageUrl = uploadResult.publicUrl;
+      }
+
+      const { error: listingImageError } = await supabase.from("listing_images").insert({
+        listing_id: listingId,
+        image_url: uploadResult.publicUrl,
+        sort_order: index,
+      });
+
+      if (listingImageError) {
+        console.error("Listing image save failed", { listingId, listingImageError });
+        return {
+          status: "error",
+          message: `Car photo save failed: ${listingImageError.message}`,
+        };
+      }
+    }
+
+    const { error: coverError } = await supabase
+      .from("listings")
+      .update({ cover_image_url: coverImageUrl })
+      .eq("id", listingId);
+
+    if (coverError) {
+      console.error("Listing cover update failed", { listingId, coverError });
+      return {
+        status: "error",
+        message: `Cover photo save failed: ${coverError.message}`,
+      };
+    }
+  }
+
+  const { error: sellerError } = await supabase.from("sellers").upsert({
     listing_id: listingId,
-    name: String(formData.get("sellerName") || ""),
-    phone: String(formData.get("sellerPhone") || ""),
+    name: sellerName,
+    phone: sellerPhone,
     address: String(formData.get("sellerAddress") || "") || null,
     notes: String(formData.get("sellerNotes") || "") || null,
-    seller_type: String(formData.get("sellerType") || "dealer"),
-  });
+    seller_type: sellerType,
+  }, { onConflict: "listing_id" });
+
+  if (sellerError) {
+    console.error("Seller save failed", { listingId, sellerError });
+    return {
+      status: "error",
+      message: `Seller save failed: ${sellerError.message}`,
+    };
+  }
 
   const buyerName = String(formData.get("buyerName") || "");
   const buyerPhone = String(formData.get("buyerPhone") || "");
 
   if (buyerName || buyerPhone) {
-    await supabase.from("buyers").upsert({
+    const { error: buyerError } = await supabase.from("buyers").upsert({
       listing_id: listingId,
       name: buyerName || null,
       phone: buyerPhone || null,
       notes: String(formData.get("buyerNotes") || "") || null,
       sold_price: Number(formData.get("soldPrice") || 0) || null,
       sale_date: String(formData.get("saleDate") || "") || null,
-    });
+    }, { onConflict: "listing_id" });
+
+    if (buyerError) {
+      console.error("Buyer save failed", { listingId, buyerError });
+      return {
+        status: "error",
+        message: `Buyer save failed: ${buyerError.message}`,
+      };
+    }
   } else {
-    await supabase.from("buyers").delete().eq("listing_id", listingId);
+    const { error: deleteBuyerError } = await supabase
+      .from("buyers")
+      .delete()
+      .eq("listing_id", listingId);
+
+    if (deleteBuyerError) {
+      console.error("Buyer cleanup failed", { listingId, deleteBuyerError });
+      return {
+        status: "error",
+        message: `Buyer cleanup failed: ${deleteBuyerError.message}`,
+      };
+    }
   }
 
   const documentFields = [
@@ -328,22 +454,33 @@ export async function saveListingAction(formData: FormData) {
 
     const extension = entry.name.split(".").pop() || "pdf";
     const path = `${listingId}/${field}-${randomUUID()}.${extension}`;
-    const publicUrl = await uploadFile("documents", path, entry);
+    const uploadResult = await uploadFileWithResult("documents", path, entry);
 
-    if (!publicUrl) {
-      continue;
+    if (!uploadResult.publicUrl) {
+      return {
+        status: "error",
+        message: uploadResult.error || "Document upload failed.",
+      };
     }
 
-    await supabase.from("documents").insert({
+    const { error: documentError } = await supabase.from("documents").insert({
       listing_id: listingId,
       doc_type: field.replace("document_", ""),
-      file_url: publicUrl,
+      file_url: uploadResult.publicUrl,
       notes: String(formData.get(`${field}_notes`) || "") || null,
     });
+
+    if (documentError) {
+      console.error("Document save failed", { listingId, field, documentError });
+      return {
+        status: "error",
+        message: `Document save failed: ${documentError.message}`,
+      };
+    }
   }
 
   await revalidateAdminFilePaths(listingId);
-  redirect("/admin/files");
+  redirect(`/admin/files/${listingId}`);
 }
 
 export async function updateSellerInfoAction(formData: FormData) {
@@ -372,7 +509,7 @@ export async function updateSellerInfoAction(formData: FormData) {
     address: String(formData.get("sellerAddress") || "") || null,
     notes: String(formData.get("sellerNotes") || "") || null,
     seller_type: sellerType,
-  });
+  }, { onConflict: "listing_id" });
 
   if (error) {
     console.error("Seller update failed", { listingId, error });
@@ -519,7 +656,7 @@ export async function updateBuyerInfoAction(formData: FormData) {
       notes: combinedNotes,
       sold_price: Number(formData.get("soldPrice") || 0) || null,
       sale_date: String(formData.get("saleDate") || "") || null,
-    });
+    }, { onConflict: "listing_id" });
 
     if (error) {
       console.error("Buyer update failed", { listingId, error });
