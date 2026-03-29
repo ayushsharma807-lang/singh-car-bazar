@@ -10,11 +10,13 @@ import {
   CircleUserRound,
   FileText,
   IndianRupee,
+  Star,
 } from "lucide-react";
 import type { AdminFileRecord, ListingDocument, ListingImage } from "@/types";
 import {
   removeDocumentByIdAction,
   removeListingImageByIdAction,
+  setListingCoverImageAction,
   uploadDocumentInlineAction,
   uploadListingImagesInlineAction,
   updateBuyerInfoAction,
@@ -40,6 +42,7 @@ type RemoveResult = {
   message: string;
   documentId?: string;
   imageId?: string;
+  imageUrl?: string;
 };
 
 type SellerDraft = {
@@ -519,32 +522,111 @@ function SellerDocCard({
 function PhotoCard({
   image,
   listingId,
+  isCover,
+  onSetCover,
   onRemove,
 }: {
   image: ListingImage;
   listingId: string;
+  isCover: boolean;
+  onSetCover: (imageId: string, imageUrl: string) => void;
   onRemove: (imageId: string) => void;
 }) {
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
-    <FileCard
-      title={getFileName(image.imageUrl)}
-      url={image.imageUrl}
-      isImage
-      onRemove={() =>
-        startTransition(async () => {
-          const formData = new FormData();
-          formData.set("listingId", listingId);
-          formData.set("imageId", image.id);
-          const result = (await removeListingImageByIdAction(formData)) as RemoveResult;
+    <>
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <button type="button" className="block w-full" onClick={() => setPreviewOpen(true)}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={image.imageUrl} alt="Car photo" className="h-28 w-full object-cover" />
+        </button>
+        <div className="grid gap-3 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-black">{getFileName(image.imageUrl)}</p>
+              <p className="mt-1 text-xs text-gray-500">Car photo</p>
+            </div>
+            {isCover ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                <Star className="h-3.5 w-3.5 fill-current" />
+                Cover
+              </span>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a href={image.imageUrl} target="_blank" rel="noreferrer" className="admin-btn admin-btn-sm">
+              Open
+            </a>
+            <button
+              type="button"
+              className="admin-btn admin-btn-sm"
+              disabled={isPending || isCover}
+              onClick={() =>
+                startTransition(async () => {
+                  const formData = new FormData();
+                  formData.set("listingId", listingId);
+                  formData.set("imageId", image.id);
+                  const result = (await setListingCoverImageAction(formData)) as RemoveResult;
 
-          if (result.success) {
-            onRemove(image.id);
-          }
-        })
-      }
-    />
+                  if (result.success) {
+                    onSetCover(image.id, image.imageUrl);
+                  }
+                })
+              }
+            >
+              {isCover ? "Main Cover" : "Set as Cover"}
+            </button>
+            <button
+              type="button"
+              className="admin-btn admin-btn-sm"
+              disabled={isPending}
+              onClick={() =>
+                startTransition(async () => {
+                  const formData = new FormData();
+                  formData.set("listingId", listingId);
+                  formData.set("imageId", image.id);
+                  const result = (await removeListingImageByIdAction(formData)) as RemoveResult;
+
+                  if (result.success) {
+                    onRemove(image.id);
+                  }
+                })
+              }
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      </div>
+      {previewOpen ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4">
+          <button
+            type="button"
+            className="absolute inset-0"
+            onClick={() => setPreviewOpen(false)}
+            aria-label="Close preview"
+          />
+          <div className="relative z-10 w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <p className="truncate text-sm font-semibold text-black">{getFileName(image.imageUrl)}</p>
+              <button
+                type="button"
+                className="admin-btn admin-btn-sm"
+                onClick={() => setPreviewOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="bg-black">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={image.imageUrl} alt="Car photo" className="max-h-[80vh] w-full object-contain" />
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -587,6 +669,9 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
     getDocumentsByType(file.listing.documents, "buyer_id"),
   );
   const [carPhotos, setCarPhotos] = useState<ListingImage[]>(file.listing.images);
+  const [coverImageUrl, setCoverImageUrl] = useState(
+    file.listing.coverImageUrl ?? file.listing.images[0]?.imageUrl ?? "",
+  );
 
   const sellerDone = Boolean(sellerDraft.name.trim() && sellerDraft.phone.trim());
   const carDone = Boolean(
@@ -987,6 +1072,9 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                   multiple
                   onSuccess={(result) => {
                     if (result.success && result.images?.length) {
+                      if (!coverImageUrl && result.images[0]?.imageUrl) {
+                        setCoverImageUrl(result.images[0].imageUrl);
+                      }
                       setCarPhotos((current) => [...current, ...result.images!]);
                     }
                   }}
@@ -1000,8 +1088,18 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                       key={image.id}
                       image={image}
                       listingId={file.id}
+                      isCover={coverImageUrl === image.imageUrl}
+                      onSetCover={(_, imageUrl) => setCoverImageUrl(imageUrl)}
                       onRemove={(imageId) =>
-                        setCarPhotos((current) => current.filter((entry) => entry.id !== imageId))
+                        setCarPhotos((current) => {
+                          const next = current.filter((entry) => entry.id !== imageId);
+                          const nextCover =
+                            next.find((entry) => entry.imageUrl === coverImageUrl)?.imageUrl ??
+                            next[0]?.imageUrl ??
+                            "";
+                          setCoverImageUrl(nextCover);
+                          return next;
+                        })
                       }
                     />
                   ))}

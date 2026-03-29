@@ -932,6 +932,65 @@ export async function removeListingImageByIdAction(formData: FormData) {
   };
 }
 
+export async function setListingCoverImageAction(formData: FormData) {
+  await requireAdminSession();
+
+  const supabase = createSupabaseAdminClient();
+  const listingId = String(formData.get("listingId") || "");
+  const imageId = String(formData.get("imageId") || "");
+
+  if (!listingId || !imageId) {
+    return {
+      success: false,
+      message: "Cover image request is missing details.",
+    };
+  }
+
+  if (!supabase) {
+    return {
+      success: false,
+      message: "Supabase admin connection is missing.",
+    };
+  }
+
+  const { data: image } = await supabase
+    .from("listing_images")
+    .select("image_url")
+    .eq("id", imageId)
+    .eq("listing_id", listingId)
+    .maybeSingle();
+
+  if (!image) {
+    return {
+      success: false,
+      message: "Photo was not found.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("listings")
+    .update({
+      cover_image_url: image.image_url,
+    })
+    .eq("id", listingId);
+
+  if (error) {
+    return {
+      success: false,
+      message: error.message,
+    };
+  }
+
+  await revalidateAdminFilePaths(listingId);
+
+  return {
+    success: true,
+    message: "Cover photo updated.",
+    imageId,
+    imageUrl: image.image_url,
+  };
+}
+
 export async function removeDocumentAction(formData: FormData) {
   await requireAdminSession();
 
