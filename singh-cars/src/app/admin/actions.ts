@@ -161,6 +161,80 @@ function buildBuyerNotes(address: string, notes: string) {
   return cleanNotes || null;
 }
 
+async function saveSellerRecord(
+  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  payload: {
+    listing_id: string;
+    name: string;
+    phone: string;
+    address: string | null;
+    notes: string | null;
+    seller_type: string;
+  },
+) {
+  const { data: updatedRows, error: updateError } = await supabase
+    .from("sellers")
+    .update(payload)
+    .eq("listing_id", payload.listing_id)
+    .select("id")
+    .limit(1);
+
+  if (updateError) {
+    return {
+      error: updateError,
+    };
+  }
+
+  if ((updatedRows?.length ?? 0) > 0) {
+    return {
+      error: null,
+    };
+  }
+
+  const { error: insertError } = await supabase.from("sellers").insert(payload);
+
+  return {
+    error: insertError,
+  };
+}
+
+async function saveBuyerRecord(
+  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  payload: {
+    listing_id: string;
+    name: string | null;
+    phone: string | null;
+    notes: string | null;
+    sold_price: number | null;
+    sale_date: string | null;
+  },
+) {
+  const { data: updatedRows, error: updateError } = await supabase
+    .from("buyers")
+    .update(payload)
+    .eq("listing_id", payload.listing_id)
+    .select("id")
+    .limit(1);
+
+  if (updateError) {
+    return {
+      error: updateError,
+    };
+  }
+
+  if ((updatedRows?.length ?? 0) > 0) {
+    return {
+      error: null,
+    };
+  }
+
+  const { error: insertError } = await supabase.from("buyers").insert(payload);
+
+  return {
+    error: insertError,
+  };
+}
+
 async function revalidateAdminFilePaths(listingId: string) {
   revalidatePath("/");
   revalidatePath("/inventory");
@@ -384,14 +458,14 @@ export async function saveListingAction(
     }
   }
 
-  const { error: sellerError } = await supabase.from("sellers").upsert({
+  const { error: sellerError } = await saveSellerRecord(supabase, {
     listing_id: listingId,
     name: sellerName,
     phone: sellerPhone,
     address: String(formData.get("sellerAddress") || "") || null,
     notes: String(formData.get("sellerNotes") || "") || null,
     seller_type: sellerType,
-  }, { onConflict: "listing_id" });
+  });
 
   if (sellerError) {
     console.error("Seller save failed", { listingId, sellerError });
@@ -405,14 +479,14 @@ export async function saveListingAction(
   const buyerPhone = String(formData.get("buyerPhone") || "");
 
   if (buyerName || buyerPhone) {
-    const { error: buyerError } = await supabase.from("buyers").upsert({
+    const { error: buyerError } = await saveBuyerRecord(supabase, {
       listing_id: listingId,
       name: buyerName || null,
       phone: buyerPhone || null,
       notes: String(formData.get("buyerNotes") || "") || null,
       sold_price: Number(formData.get("soldPrice") || 0) || null,
       sale_date: String(formData.get("saleDate") || "") || null,
-    }, { onConflict: "listing_id" });
+    });
 
     if (buyerError) {
       console.error("Buyer save failed", { listingId, buyerError });
@@ -502,14 +576,14 @@ export async function updateSellerInfoAction(formData: FormData) {
 
   const sellerType = submittedSellerType || existingSeller?.seller_type || "dealer";
 
-  const { error } = await supabase.from("sellers").upsert({
+  const { error } = await saveSellerRecord(supabase, {
     listing_id: listingId,
     name: String(formData.get("sellerName") || ""),
     phone: String(formData.get("sellerPhone") || ""),
     address: String(formData.get("sellerAddress") || "") || null,
     notes: String(formData.get("sellerNotes") || "") || null,
     seller_type: sellerType,
-  }, { onConflict: "listing_id" });
+  });
 
   if (error) {
     console.error("Seller update failed", { listingId, error });
@@ -649,14 +723,14 @@ export async function updateBuyerInfoAction(formData: FormData) {
   if (!buyerName && !buyerPhone && !buyerAddress && !buyerNotes && !formData.get("soldPrice") && !formData.get("saleDate")) {
     await supabase.from("buyers").delete().eq("listing_id", listingId);
   } else {
-    const { error } = await supabase.from("buyers").upsert({
+    const { error } = await saveBuyerRecord(supabase, {
       listing_id: listingId,
       name: buyerName || null,
       phone: buyerPhone || null,
       notes: combinedNotes,
       sold_price: Number(formData.get("soldPrice") || 0) || null,
       sale_date: String(formData.get("saleDate") || "") || null,
-    }, { onConflict: "listing_id" });
+    });
 
     if (error) {
       console.error("Buyer update failed", { listingId, error });
