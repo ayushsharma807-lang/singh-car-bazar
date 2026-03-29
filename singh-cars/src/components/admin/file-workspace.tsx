@@ -18,7 +18,6 @@ import {
   removeListingImageByIdAction,
   setListingCoverImageAction,
   uploadDocumentInlineAction,
-  uploadListingImagesInlineAction,
   updateBuyerInfoAction,
   updateCarInfoAction,
   updateSellerInfoAction,
@@ -242,6 +241,134 @@ function UploadPicker({
                 setFeedback({
                   tone: "error",
                   message: result.message,
+                });
+              }
+            } catch (error) {
+              setFeedback({
+                tone: "error",
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : "Upload failed. Please try again.",
+              });
+            }
+          });
+
+          event.currentTarget.value = "";
+        }}
+      />
+      <button
+        type="button"
+        className="admin-btn h-12 px-4 text-sm"
+        disabled={isPending}
+        onClick={() => inputRef.current?.click()}
+      >
+        {isPending ? "Uploading..." : buttonLabel}
+      </button>
+      {feedback.message ? (
+        <p
+          className={`text-sm ${
+            feedback.tone === "error"
+              ? "text-red-600"
+              : feedback.tone === "success"
+                ? "text-green-700"
+                : "text-gray-500"
+          }`}
+        >
+          {feedback.message}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function ApiUploadPicker({
+  url,
+  listingId,
+  buttonLabel,
+  inputName,
+  accept,
+  multiple = false,
+  onSuccess,
+}: {
+  url: string;
+  listingId: string;
+  buttonLabel: string;
+  inputName: string;
+  accept?: string;
+  multiple?: boolean;
+  onSuccess?: (result: UploadResult) => void;
+}) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [feedback, setFeedback] = useState<{
+    tone: "idle" | "success" | "error";
+    message: string;
+  }>({
+    tone: "idle",
+    message: "",
+  });
+
+  return (
+    <div className="grid gap-2">
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        multiple={multiple}
+        className="hidden"
+        onChange={(event) => {
+          const files = Array.from(event.currentTarget.files ?? []);
+
+          if (!files.length) {
+            return;
+          }
+
+          const uploadFormData = new FormData();
+          uploadFormData.set("listingId", listingId);
+
+          if (multiple) {
+            for (const file of files) {
+              uploadFormData.append(inputName, file);
+            }
+          } else {
+            uploadFormData.set(inputName, files[0]);
+          }
+
+          setFeedback({
+            tone: "idle",
+            message:
+              files.length > 1
+                ? `Uploading ${files.length} files...`
+                : `Uploading ${files[0]?.name || "file"}...`,
+          });
+
+          startTransition(async () => {
+            try {
+              const response = await fetch(url, {
+                method: "POST",
+                body: uploadFormData,
+              });
+
+              const result = (await response.json()) as UploadResult;
+
+              if (response.ok && result.success) {
+                setFeedback({
+                  tone: "success",
+                  message: result.message,
+                });
+                onSuccess?.(result);
+
+                if (!onSuccess) {
+                  window.setTimeout(() => {
+                    router.refresh();
+                  }, 700);
+                }
+              } else {
+                setFeedback({
+                  tone: "error",
+                  message: result.message || "Upload failed. Please try again.",
                 });
               }
             } catch (error) {
@@ -1073,8 +1200,8 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                       : "No car photos uploaded yet"}
                   </p>
                 </div>
-                <UploadPicker
-                  action={uploadListingImagesInlineAction}
+                <ApiUploadPicker
+                  url="/api/admin/upload-listing-images"
                   listingId={file.id}
                   buttonLabel="Upload Car Photos"
                   inputName="images"
