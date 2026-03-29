@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getPublicListingChecklist } from "@/lib/data";
 import { formatDateTime } from "@/lib/utils";
 import type { AdminFileRecord } from "@/types";
 import { StatusPill } from "@/components/admin/status-pill";
@@ -39,6 +40,16 @@ export function RecentFilesTable({ files }: { files: AdminFileRecord[] }) {
             <span className={`rounded-xl border px-3 py-2 ${file.publicListingStatus.ready ? "border-green-200 bg-green-50 text-green-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
               Public {file.publicListingStatus.ready ? "Ready" : "Incomplete"}
             </span>
+            {!file.publicListingStatus.ready
+              ? getPublicListingChecklist(file.publicListingStatus.missing).map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800"
+                  >
+                    {item}
+                  </span>
+                ))
+              : null}
           </div>
         </Link>
       ))}

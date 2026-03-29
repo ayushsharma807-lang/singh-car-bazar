@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getPublicListingChecklist } from "@/lib/data";
 import type { AdminFileRecord } from "@/types";
 import { StatusPill } from "@/components/admin/status-pill";
 
@@ -32,6 +33,19 @@ export function FilesTable({ files }: { files: AdminFileRecord[] }) {
             <div className="mt-3">
               <PublicBadge ready={file.publicListingStatus.ready} />
             </div>
+
+            {!file.publicListingStatus.ready ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {getPublicListingChecklist(file.publicListingStatus.missing).map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            ) : null}
 
             <div className="mt-4 flex gap-3">
               <Link href={`/admin/files/${file.id}`} className="admin-btn flex-1 text-center">
@@ -79,6 +93,18 @@ export function FilesTable({ files }: { files: AdminFileRecord[] }) {
                 <td className="px-4 py-3"><DocBadge label="Buyer" ready={file.documentStatus.buyerReady} compact /></td>
                 <td className="px-4 py-3"><PublicBadge ready={file.publicListingStatus.ready} compact /></td>
                 <td className="px-4 py-3">
+                  {!file.publicListingStatus.ready ? (
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {getPublicListingChecklist(file.publicListingStatus.missing).map((item) => (
+                        <span
+                          key={item}
+                          className="rounded-xl border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="flex gap-3">
                     <Link href={`/admin/files/${file.id}`} className="text-sky-700 hover:underline">
                       Open File

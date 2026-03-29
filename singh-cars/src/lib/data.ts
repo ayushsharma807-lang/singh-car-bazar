@@ -173,6 +173,17 @@ export function getPublicListingStatus(
   };
 }
 
+export function getPublicListingChecklist(missing: string[]) {
+  const labels: Record<string, string> = {
+    title: "Missing title",
+    price: "Missing price",
+    photo: "Missing photo",
+    status: "Mark as available",
+  };
+
+  return missing.map((item) => labels[item] ?? `Missing ${item}`);
+}
+
 function applyInventoryFilters(listings: Listing[], filters: InventoryFilters) {
   return listings.filter((listing) => {
     if (filters.search) {
