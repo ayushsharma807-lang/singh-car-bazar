@@ -4,6 +4,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronRight, FileImage, FileText, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { UploadSourceButton } from "@/components/admin/upload-source-button";
 import type { Listing } from "@/types";
 
 type ListingFormProps = {
@@ -20,6 +21,15 @@ type FormSubmitState = {
 
 const stepOrder: Step[] = ["seller", "car", "buyer"];
 const documentAccept = ".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx";
+const photoAccept = ".jpg,.jpeg,.png,.webp,.heic,.heif";
+const uploadFieldNames = [
+  "document_seller_id",
+  "images",
+  "document_rc",
+  "document_insurance",
+  "document_other",
+  "document_buyer_id",
+] as const;
 
 const carDocumentFields = [
   { label: "RC", name: "document_rc", accept: documentAccept },
@@ -113,7 +123,7 @@ function UploadCard({
   name,
   accept,
   multiple = false,
-  selectedText,
+  files,
   onFilesChange,
 }: {
   label: string;
@@ -121,27 +131,83 @@ function UploadCard({
   name: string;
   accept: string;
   multiple?: boolean;
-  selectedText?: string;
-  onFilesChange: (name: string, files: FileList | null) => void;
+  files?: File[];
+  onFilesChange: (name: string, sourceKey: string, files: FileList | null) => void;
 }) {
+  const fileCount = files?.length || 0;
+  const selectedText = fileCount
+    ? fileCount === 1
+      ? files?.[0]?.name || helper
+      : `${fileCount} files ready to upload`
+    : helper;
+  const isPhotoField = name === "images";
+  const sheetTitle = isPhotoField ? "Add car photos" : label;
+
   return (
-    <label className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+    <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
       <div>
         <p className="text-sm font-semibold text-black">{label}</p>
-        <p className="mt-1 text-sm text-gray-600">{selectedText || helper}</p>
+        <p className="mt-1 text-sm text-gray-600">{selectedText}</p>
       </div>
-      <span className="inline-flex min-h-12 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-black">
-        {multiple ? "Choose Files" : "Choose File"}
-      </span>
-      <input
-        type="file"
-        name={name}
-        accept={accept}
-        multiple={multiple}
-        className="sr-only"
-        onChange={(event) => onFilesChange(name, event.target.files)}
+      <UploadSourceButton
+        buttonLabel={fileCount ? "Add More" : "Choose Source"}
+        sheetTitle={sheetTitle}
+        desktopSourceKey="files"
+        className="inline-flex min-h-12 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-black"
+        options={
+          isPhotoField
+            ? [
+                {
+                  key: "camera",
+                  label: "Camera",
+                  hint: "Take a new photo now",
+                  accept: "image/*",
+                  capture: "environment",
+                  multiple: false,
+                },
+                {
+                  key: "gallery",
+                  label: "Gallery",
+                  hint: multiple ? "Choose one or more images" : "Choose an image",
+                  accept: "image/*",
+                  multiple,
+                },
+                {
+                  key: "files",
+                  label: "Files",
+                  hint: "Pick images from device files",
+                  accept: "image/*",
+                  multiple,
+                },
+              ]
+            : [
+                {
+                  key: "camera",
+                  label: "Camera",
+                  hint: "Scan with the camera",
+                  accept: "image/*",
+                  capture: "environment",
+                  multiple: false,
+                },
+                {
+                  key: "gallery",
+                  label: "Gallery",
+                  hint: multiple ? "Choose one or more images" : "Choose an image",
+                  accept: "image/*",
+                  multiple,
+                },
+                {
+                  key: "files",
+                  label: "Files",
+                  hint: "Pick PDF or documents",
+                  accept,
+                  multiple,
+                },
+              ]
+        }
+        onFilesSelected={(sourceKey, fileList) => onFilesChange(name, sourceKey, fileList)}
       />
-    </label>
+    </div>
   );
 }
 
@@ -155,7 +221,7 @@ export function ListingForm({ listing }: ListingFormProps) {
   const [isPending, setIsPending] = useState(false);
   const [step, setStep] = useState<Step>("seller");
   const [localMessage, setLocalMessage] = useState<string>("");
-  const [selectedFiles, setSelectedFiles] = useState<Record<string, string>>({});
+  const [selectedFiles, setSelectedFiles] = useState<Record<string, File[]>>({});
 
   useEffect(() => {
     if (state.status !== "success" || !state.redirectTo) {
@@ -174,23 +240,35 @@ export function ListingForm({ listing }: ListingFormProps) {
     }
   }
 
-  function updateFileLabel(name: string, files: FileList | null) {
+  function updateSelectedFiles(name: string, sourceKey: string, files: FileList | null) {
     if (!files?.length) {
-      setSelectedFiles((current) => {
-        const next = { ...current };
-        delete next[name];
-        return next;
-      });
       return;
     }
 
-    const label =
-      files.length === 1 ? files[0].name : `${files.length} files selected`;
+    const incomingFiles = Array.from(files);
 
-    setSelectedFiles((current) => ({
-      ...current,
-      [name]: label,
-    }));
+    setSelectedFiles((current) => {
+      const existingFiles = current[name] ?? [];
+      const nextFiles =
+        sourceKey === "camera"
+          ? [...existingFiles, ...incomingFiles]
+          : [...existingFiles, ...incomingFiles];
+
+      const deduped = nextFiles.filter(
+        (file, index, items) =>
+          items.findIndex(
+            (entry) =>
+              entry.name === file.name &&
+              entry.size === file.size &&
+              entry.lastModified === file.lastModified,
+          ) === index,
+      );
+
+      return {
+        ...current,
+        [name]: deduped,
+      };
+    });
   }
 
   function readField(name: string) {
@@ -240,9 +318,20 @@ export function ListingForm({ listing }: ListingFormProps) {
     setIsPending(true);
 
     try {
+      const payload = new FormData(formRef.current);
+      for (const fieldName of uploadFieldNames) {
+        payload.delete(fieldName);
+      }
+
+      Object.entries(selectedFiles).forEach(([fieldName, files]) => {
+        files.forEach((file) => {
+          payload.append(fieldName, file);
+        });
+      });
+
       const response = await fetch("/api/admin/create-file", {
         method: "POST",
-        body: new FormData(formRef.current),
+        body: payload,
       });
 
       const contentType = response.headers.get("content-type") || "";
@@ -368,8 +457,8 @@ export function ListingForm({ listing }: ListingFormProps) {
               name="document_seller_id"
               accept={documentAccept}
               multiple
-              selectedText={selectedFiles.document_seller_id}
-              onFilesChange={updateFileLabel}
+              files={selectedFiles.document_seller_id}
+              onFilesChange={updateSelectedFiles}
             />
           </div>
 
@@ -464,10 +553,10 @@ export function ListingForm({ listing }: ListingFormProps) {
               label="Upload Car Photos"
               helper="Pick one or more car photos."
               name="images"
-              accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
+              accept={photoAccept}
               multiple
-              selectedText={selectedFiles.images}
-              onFilesChange={updateFileLabel}
+              files={selectedFiles.images}
+              onFilesChange={updateSelectedFiles}
             />
 
             <div className="grid gap-3 sm:grid-cols-3">
@@ -479,8 +568,8 @@ export function ListingForm({ listing }: ListingFormProps) {
                   name={field.name}
                   accept={field.accept}
                   multiple
-                  selectedText={selectedFiles[field.name]}
-                  onFilesChange={updateFileLabel}
+                  files={selectedFiles[field.name]}
+                  onFilesChange={updateSelectedFiles}
                 />
               ))}
             </div>
@@ -549,8 +638,8 @@ export function ListingForm({ listing }: ListingFormProps) {
               name="document_buyer_id"
               accept={documentAccept}
               multiple
-              selectedText={selectedFiles.document_buyer_id}
-              onFilesChange={updateFileLabel}
+              files={selectedFiles.document_buyer_id}
+              onFilesChange={updateSelectedFiles}
             />
           </div>
 

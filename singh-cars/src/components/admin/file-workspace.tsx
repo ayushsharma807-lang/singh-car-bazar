@@ -13,6 +13,7 @@ import {
   Star,
 } from "lucide-react";
 import type { AdminFileRecord, ListingDocument, ListingImage } from "@/types";
+import { UploadSourceButton } from "@/components/admin/upload-source-button";
 import {
   uploadDocumentInlineAction,
   uploadListingImagesInlineAction,
@@ -107,6 +108,56 @@ const DOCUMENT_EXTENSIONS = [
   ".heif",
   ".doc",
   ".docx",
+];
+
+const documentUploadOptions = (accept: string) => [
+  {
+    key: "camera",
+    label: "Camera",
+    hint: "Scan with the camera",
+    accept: "image/*",
+    capture: "environment" as const,
+    multiple: false,
+  },
+  {
+    key: "gallery",
+    label: "Gallery",
+    hint: "Choose one or more images",
+    accept: "image/*",
+    multiple: true,
+  },
+  {
+    key: "files",
+    label: "Files",
+    hint: "Pick PDF or document files",
+    accept,
+    multiple: true,
+  },
+];
+
+const photoUploadOptions = [
+  {
+    key: "camera",
+    label: "Camera",
+    hint: "Take a new photo now",
+    accept: "image/*",
+    capture: "environment" as const,
+    multiple: false,
+  },
+  {
+    key: "gallery",
+    label: "Gallery",
+    hint: "Choose one or more photos",
+    accept: "image/*",
+    multiple: true,
+  },
+  {
+    key: "files",
+    label: "Files",
+    hint: "Pick images from device files",
+    accept: "image/*",
+    multiple: true,
+  },
 ];
 
 function getFileName(url: string) {
@@ -426,16 +477,17 @@ function UploadPicker({
   buttonLabel,
   docType,
   accept,
+  multiple = true,
   onSuccess,
 }: {
   listingId: string;
   buttonLabel: string;
   docType: string;
   accept?: string;
+  multiple?: boolean;
   onSuccess?: (result: UploadResult) => void;
 }) {
   const router = useRouter();
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const [isPending, startTransition] = useTransition();
   const [queue, setQueue] = useState<UploadQueueItem[]>([]);
   const [feedback, setFeedback] = useState<{
@@ -448,134 +500,164 @@ function UploadPicker({
 
   return (
     <div className="grid gap-2">
-      <input
-        ref={inputRef}
-        type="file"
-        accept={accept}
-        className="hidden"
-        onChange={(event) => {
-          const files = Array.from(event.currentTarget.files ?? []);
-          const file = files[0];
+      <UploadSourceButton
+        buttonLabel={isPending ? "Uploading..." : buttonLabel}
+        sheetTitle={buttonLabel}
+        desktopSourceKey="files"
+        disabled={isPending}
+        className="admin-btn h-12 px-4 text-sm"
+        options={documentUploadOptions(
+          accept || ".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx",
+        ).map((option) => ({
+          ...option,
+          multiple: option.key === "camera" ? false : multiple,
+        }))}
+        onFilesSelected={(_, fileList) => {
+          const files = Array.from(fileList ?? []);
 
-          if (!file) {
+          if (!files.length) {
             return;
           }
 
-          const lowerName = file.name.toLowerCase();
-          const hasAcceptedExtension = DOCUMENT_EXTENSIONS.some((extension) =>
-            lowerName.endsWith(extension),
-          );
+          const queuedItems = files.map((file) => ({
+            id: crypto.randomUUID(),
+            name: file.name,
+            status: "queued" as const,
+            message: "Waiting to upload",
+            file,
+          }));
 
-          if (!hasAcceptedExtension) {
+          setQueue((current) => [...queuedItems, ...current].slice(0, 12));
+
+          const invalidFile = files.find((file) => {
+            const lowerName = file.name.toLowerCase();
+            const validExtension =
+              DOCUMENT_EXTENSIONS.some((extension) => lowerName.endsWith(extension)) ||
+              file.type.toLowerCase().startsWith("image/");
+            return !validExtension || file.size > DOCUMENT_MAX_BYTES;
+          });
+
+          if (invalidFile) {
+            const lowerName = invalidFile.name.toLowerCase();
+            const validExtension =
+              DOCUMENT_EXTENSIONS.some((extension) => lowerName.endsWith(extension)) ||
+              invalidFile.type.toLowerCase().startsWith("image/");
+            const message = !validExtension
+              ? "Unsupported format. Use PDF, JPG, PNG, WEBP, HEIC, HEIF, DOC, or DOCX."
+              : `File too large. Limit is ${formatFileSize(DOCUMENT_MAX_BYTES)}.`;
+
             setFeedback({
               tone: "error",
-              message: "Unsupported format. Use PDF, JPG, PNG, WEBP, HEIC, DOC, or DOCX.",
+              message,
             });
-            event.currentTarget.value = "";
+            setQueue((current) =>
+              current.map((item) =>
+                item.name === invalidFile.name
+                  ? { ...item, status: "error", message }
+                  : item,
+              ),
+            );
             return;
           }
-
-          if (file.size > DOCUMENT_MAX_BYTES) {
-            setFeedback({
-              tone: "error",
-              message: `File too large. Limit is ${formatFileSize(DOCUMENT_MAX_BYTES)}.`,
-            });
-            event.currentTarget.value = "";
-            return;
-          }
-
-          const uploadId = crypto.randomUUID();
-          setQueue((current) => [
-            {
-              id: uploadId,
-              name: file.name,
-              status: "queued",
-              message: "Waiting to upload",
-              file,
-            },
-            ...current.slice(0, 4),
-          ]);
 
           setFeedback({
             tone: "idle",
-            message: `Uploading ${file.name}...`,
+            message:
+              files.length > 1
+                ? `Uploading 1 of ${files.length}...`
+                : `Uploading ${files[0]?.name || "document"}...`,
           });
 
           startTransition(async () => {
-            try {
-              setQueue((current) =>
-                updateQueueItem(current, uploadId, {
-                  status: "uploading",
-                  message: "Uploading...",
-                }),
-              );
+            let uploadedCount = 0;
+            let failedCount = 0;
 
-              const payload = new FormData();
-              payload.append("listingId", listingId);
-              payload.append("docType", docType);
-              payload.append("file", file);
-              const result = await uploadDocumentInlineAction(payload);
+            for (const [index, queueItem] of queuedItems.entries()) {
+              const file = queueItem.file;
 
-              if (!result.success || !result.documentId || !result.fileUrl) {
-                const message = result.message || "Document upload failed.";
+              if (!file) {
+                continue;
+              }
+
+              try {
                 setFeedback({
-                  tone: "error",
-                  message,
+                  tone: "idle",
+                  message: `Uploading ${index + 1} of ${queuedItems.length}...`,
                 });
                 setQueue((current) =>
-                  updateQueueItem(current, uploadId, {
+                  updateQueueItem(current, queueItem.id, {
+                    status: "uploading",
+                    message: "Uploading...",
+                  }),
+                );
+
+                const payload = new FormData();
+                payload.append("listingId", listingId);
+                payload.append("docType", docType);
+                payload.append("file", file);
+                const result = await uploadDocumentInlineAction(payload);
+
+                if (!result.success || !result.documentId || !result.fileUrl) {
+                  const message = result.message || "Document upload failed.";
+                  setQueue((current) =>
+                    updateQueueItem(current, queueItem.id, {
+                      status: "error",
+                      message,
+                    }),
+                  );
+                  failedCount += 1;
+                  continue;
+                }
+
+                uploadedCount += 1;
+                setQueue((current) =>
+                  updateQueueItem(current, queueItem.id, {
+                    status: "success",
+                    message: "Uploaded",
+                  }),
+                );
+                onSuccess?.(result);
+              } catch (error) {
+                console.error("Document upload failed", {
+                  listingId,
+                  docType,
+                  fileName: file.name,
+                  error,
+                });
+                const message = getFriendlyUploadError(error);
+                setQueue((current) =>
+                  updateQueueItem(current, queueItem.id, {
                     status: "error",
                     message,
                   }),
                 );
-                return;
+                failedCount += 1;
               }
+            }
 
-              setFeedback({
-                tone: "success",
-                message: result.message,
-              });
-              setQueue((current) =>
-                updateQueueItem(current, uploadId, {
-                  status: "success",
-                  message: "Uploaded",
-                }),
-              );
-              onSuccess?.(result);
-              window.setTimeout(() => {
-                router.refresh();
-              }, 500);
-            } catch (error) {
-              console.error("Document upload failed", {
-                listingId,
-                docType,
-                error,
-              });
-              const message = getFriendlyUploadError(error);
+            if (!uploadedCount) {
               setFeedback({
                 tone: "error",
-                message,
+                message: failedCount
+                  ? "Upload failed. Please try again."
+                  : "No document was uploaded.",
               });
-              setQueue((current) =>
-                updateQueueItem(current, uploadId, {
-                  status: "error",
-                  message,
-                }),
-              );
+              return;
             }
-          });
 
-          event.currentTarget.value = "";
+            setFeedback({
+              tone: failedCount > 0 ? "error" : "success",
+              message:
+                failedCount > 0
+                  ? `${uploadedCount} uploaded, ${failedCount} failed.`
+                  : `${uploadedCount} file${uploadedCount > 1 ? "s" : ""} uploaded successfully.`,
+            });
+            window.setTimeout(() => {
+              router.refresh();
+            }, 500);
+          });
         }}
       />
-      <button
-        type="button"
-        className="admin-btn h-12 px-4 text-sm"
-        disabled={isPending}
-        onClick={() => inputRef.current?.click()}
-      >
-        {isPending ? "Uploading..." : buttonLabel}
-      </button>
       {feedback.message ? (
         <p
           className={`text-sm ${
@@ -628,18 +710,15 @@ function UploadPicker({
 function ApiUploadPicker({
   listingId,
   buttonLabel,
-  accept,
   multiple = false,
   onSuccess,
 }: {
   listingId: string;
   buttonLabel: string;
-  accept?: string;
   multiple?: boolean;
   onSuccess?: (result: UploadResult) => void;
 }) {
   const router = useRouter();
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const [isPending, startTransition] = useTransition();
   const [queue, setQueue] = useState<UploadQueueItem[]>([]);
   const [feedback, setFeedback] = useState<{
@@ -652,14 +731,18 @@ function ApiUploadPicker({
 
   return (
     <div className="grid gap-2">
-      <input
-        ref={inputRef}
-        type="file"
-        accept={accept}
-        multiple={multiple}
-        className="hidden"
-        onChange={(event) => {
-          const files = Array.from(event.currentTarget.files ?? []);
+      <UploadSourceButton
+        buttonLabel={isPending ? "Uploading..." : buttonLabel}
+        sheetTitle={buttonLabel}
+        desktopSourceKey="files"
+        disabled={isPending}
+        className="admin-btn h-12 px-4 text-sm"
+        options={photoUploadOptions.map((option) => ({
+          ...option,
+          multiple: option.key === "camera" ? false : multiple,
+        }))}
+        onFilesSelected={(_, fileList) => {
+          const files = Array.from(fileList ?? []);
 
           if (!files.length) {
             return;
@@ -677,17 +760,17 @@ function ApiUploadPicker({
 
           const invalidFile = files.find((file) => {
             const lowerName = file.name.toLowerCase();
-            const validExtension = PHOTO_EXTENSIONS.some((extension) =>
-              lowerName.endsWith(extension),
-            );
+            const validExtension =
+              PHOTO_EXTENSIONS.some((extension) => lowerName.endsWith(extension)) ||
+              file.type.toLowerCase().startsWith("image/");
             return !validExtension || file.size > PHOTO_MAX_BYTES;
           });
 
           if (invalidFile) {
             const lowerName = invalidFile.name.toLowerCase();
-            const validExtension = PHOTO_EXTENSIONS.some((extension) =>
-              lowerName.endsWith(extension),
-            );
+            const validExtension =
+              PHOTO_EXTENSIONS.some((extension) => lowerName.endsWith(extension)) ||
+              invalidFile.type.toLowerCase().startsWith("image/");
             const message = !validExtension
               ? "Unsupported format. Use JPG, JPEG, PNG, WEBP, HEIC, or HEIF."
               : `File too large. Limit is ${formatFileSize(PHOTO_MAX_BYTES)}.`;
@@ -703,7 +786,6 @@ function ApiUploadPicker({
                   : item,
               ),
             );
-            event.currentTarget.value = "";
             return;
           }
 
@@ -823,18 +905,8 @@ function ApiUploadPicker({
               });
             }
           });
-
-          event.currentTarget.value = "";
         }}
       />
-      <button
-        type="button"
-        className="admin-btn h-12 px-4 text-sm"
-        disabled={isPending}
-        onClick={() => inputRef.current?.click()}
-      >
-        {isPending ? "Uploading..." : buttonLabel}
-      </button>
       {feedback.message ? (
         <p
           className={`text-sm ${
@@ -2131,7 +2203,6 @@ export function FileWorkspace({
                   <ApiUploadPicker
                     listingId={file.id}
                     buttonLabel="Upload Car Photos"
-                    accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
                     multiple
                     onSuccess={(result) => {
                       if (result.success && result.images?.length) {
@@ -2348,7 +2419,6 @@ export function FileWorkspace({
                   <ApiUploadPicker
                     listingId={file.id}
                     buttonLabel={carPhotos.length ? "Add More Photos" : "Upload Car Photos"}
-                    accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
                     multiple
                     onSuccess={(result) => {
                       if (result.success && result.images?.length) {
