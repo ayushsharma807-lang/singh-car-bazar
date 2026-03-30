@@ -406,33 +406,39 @@ export function ListingForm({ listing }: ListingFormProps) {
       },
     ] as const;
 
-    for (const plan of uploadPlans) {
-      const files = selectedFiles[plan.field] ?? [];
+    async function uploadSingleFile(
+      endpoint: string,
+      payload: FormData,
+      label: string,
+      fileName: string,
+    ) {
+      let response: Response | null = null;
+      let lastError: unknown = null;
 
-      if (!files.length) {
-        continue;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          response = await fetch(endpoint, {
+            method: "POST",
+            body: payload,
+          });
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error;
+        }
       }
 
-      const uploadPayload = new FormData();
-      uploadPayload.append("listingId", listingId);
+      if (!response) {
+        const networkMessage =
+          lastError instanceof Error ? lastError.message : "Network request failed.";
+        throw new Error(`${label} upload failed for ${fileName}: ${networkMessage}`);
+      }
 
-      Object.entries(plan.extraFields).forEach(([key, value]) => {
-        uploadPayload.append(key, value);
-      });
-
-      files.forEach((file) => {
-        uploadPayload.append(plan.filesField, file);
-      });
-
-      const response = await fetch(plan.endpoint, {
-        method: "POST",
-        body: uploadPayload,
-      });
       const contentType = response.headers.get("content-type") || "";
 
       if (!contentType.includes("application/json")) {
         throw new Error(
-          `${plan.label} upload failed. The file was created, but the server returned an unexpected response.`,
+          `${label} upload failed for ${fileName}. The server returned an unexpected response.`,
         );
       }
 
@@ -442,7 +448,27 @@ export function ListingForm({ listing }: ListingFormProps) {
       };
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || `${plan.label} upload failed.`);
+        throw new Error(result.message || `${label} upload failed for ${fileName}.`);
+      }
+    }
+
+    for (const plan of uploadPlans) {
+      const files = selectedFiles[plan.field] ?? [];
+
+      if (!files.length) {
+        continue;
+      }
+
+      for (const file of files) {
+        const uploadPayload = new FormData();
+        uploadPayload.append("listingId", listingId);
+
+        Object.entries(plan.extraFields).forEach(([key, value]) => {
+          uploadPayload.append(key, value);
+        });
+
+        uploadPayload.append(plan.filesField, file);
+        await uploadSingleFile(plan.endpoint, uploadPayload, plan.label, file.name);
       }
     }
   }
