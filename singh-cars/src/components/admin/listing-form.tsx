@@ -363,13 +363,6 @@ export function ListingForm({ listing }: ListingFormProps) {
   async function uploadFilesForListing(listingId: string) {
     const uploadPlans = [
       {
-        field: "images",
-        label: "Car photos",
-        endpoint: "/api/admin/upload-listing-images",
-        filesField: "images",
-        extraFields: {} as Record<string, string>,
-      },
-      {
         field: "document_seller_id",
         label: "Seller documents",
         endpoint: "/api/admin/upload-documents",
@@ -403,6 +396,13 @@ export function ListingForm({ listing }: ListingFormProps) {
         endpoint: "/api/admin/upload-documents",
         filesField: "files",
         extraFields: { docType: "buyer_id" },
+      },
+      {
+        field: "images",
+        label: "Car photos",
+        endpoint: "/api/admin/upload-listing-images",
+        filesField: "images",
+        extraFields: {} as Record<string, string>,
       },
     ] as const;
 
@@ -452,6 +452,8 @@ export function ListingForm({ listing }: ListingFormProps) {
       }
     }
 
+    const failedUploads: string[] = [];
+
     for (const plan of uploadPlans) {
       const files = selectedFiles[plan.field] ?? [];
 
@@ -468,9 +470,25 @@ export function ListingForm({ listing }: ListingFormProps) {
         });
 
         uploadPayload.append(plan.filesField, file);
-        await uploadSingleFile(plan.endpoint, uploadPayload, plan.label, file.name);
+        try {
+          await uploadSingleFile(plan.endpoint, uploadPayload, plan.label, file.name);
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : `${plan.label} upload failed for ${file.name}.`;
+          failedUploads.push(message);
+          console.error("Create File follow-up upload failed", {
+            listingId,
+            label: plan.label,
+            fileName: file.name,
+            message,
+          });
+        }
       }
     }
+
+    return failedUploads;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -524,7 +542,13 @@ export function ListingForm({ listing }: ListingFormProps) {
         throw new Error("File was created, but the saved file id is missing.");
       }
 
-      await uploadFilesForListing(listingId);
+      const failedUploads = await uploadFilesForListing(listingId);
+
+      if (failedUploads.length) {
+        throw new Error(
+          `${failedUploads[0]}${failedUploads.length > 1 ? ` ${failedUploads.length - 1} more upload issue(s) also happened.` : ""}`,
+        );
+      }
 
       setState({
         status: "success",
