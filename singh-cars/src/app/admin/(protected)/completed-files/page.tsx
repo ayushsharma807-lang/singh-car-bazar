@@ -41,6 +41,11 @@ export default async function CompletedFilesPage({
       searchPlaceholder="Search completed files by number plate, file no., seller, buyer..."
     >
       <div className="grid gap-5">
+        {params.completed === "1" ? (
+          <section className="rounded-xl border border-green-200 bg-green-50 px-6 py-4 text-sm font-semibold text-green-800 shadow-sm">
+            File moved to Completed Files.
+          </section>
+        ) : null}
         <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gray-500">
             Completed Files

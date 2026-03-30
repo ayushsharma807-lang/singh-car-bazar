@@ -1,9 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { markListingSoldAction } from "@/app/admin/actions";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { FileWorkspace } from "@/components/admin/file-workspace";
-import { StatusPill } from "@/components/admin/status-pill";
-import { getAdminFileById, getPublicListingChecklist } from "@/lib/data";
+import { getAdminFileById } from "@/lib/data";
 
 type AdminFileDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -29,6 +29,31 @@ export default async function AdminFileDetailPage({
     notFound();
   }
 
+  const topStatus =
+    file.status === "sold"
+      ? "Sold"
+      : file.publicListingStatus.ready
+        ? "Ready"
+        : "In Progress";
+  const nextStep =
+    !file.listing.seller?.name?.trim() || !file.listing.seller?.phone?.trim()
+      ? "seller"
+      : !file.listing.make.trim() || !file.listing.model.trim() || !file.listing.numberPlate.trim()
+        ? "car"
+        : file.status === "sold" && (!file.listing.buyer?.name?.trim() || !file.listing.buyer?.phone?.trim())
+          ? "buyer"
+          : null;
+  const nextStepText =
+    nextStep === "seller"
+      ? "Next: add seller details."
+      : nextStep === "car"
+        ? "Next: add car details."
+        : nextStep === "buyer"
+          ? "Next: add buyer details."
+          : file.isCompletedFile
+            ? "This file is ready to move to Completed Files."
+            : "Keep adding papers and photos to finish this file.";
+
   return (
     <AdminShell>
       <div className="grid gap-5">
@@ -45,48 +70,50 @@ export default async function AdminFileDetailPage({
                 File {file.fileNumber}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <StatusPill status={file.status} />
                 <span
                   className={`inline-flex rounded-xl border px-3 py-1 text-xs font-semibold ${
-                    file.publicListingStatus.ready
-                      ? "border-green-200 bg-green-50 text-green-800"
-                      : "border-amber-200 bg-amber-50 text-amber-800"
+                    topStatus === "Sold"
+                      ? "border-red-200 bg-red-50 text-red-700"
+                      : topStatus === "Ready"
+                        ? "border-green-200 bg-green-50 text-green-700"
+                        : "border-amber-200 bg-amber-50 text-amber-700"
                   }`}
                 >
-                  Public {file.publicListingStatus.ready ? "Ready" : "Incomplete"}
+                  {topStatus}
                 </span>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {file.publicListingStatus.ready ? (
-                  <span className="rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-800">
-                    Ready for public listing
-                  </span>
-                ) : (
-                  getPublicListingChecklist(file.publicListingStatus.missing).map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800"
-                    >
-                      {item}
-                    </span>
-                  ))
-                )}
-              </div>
+              <p className="mt-3 text-sm text-gray-600">{nextStepText}</p>
             </div>
-            <form action={markListingSoldAction}>
-              <input type="hidden" name="listingId" value={file.id} />
-              <button
-                type="submit"
+            {file.isCompletedFile ? (
+              <Link
+                href={`/admin/completed-files?completed=1&file=${file.id}`}
                 className="admin-btn h-12 px-5 text-base"
-                disabled={file.status === "sold"}
               >
-                {file.status === "sold" ? "Already Sold" : "Mark as Sold"}
-              </button>
-            </form>
+                Mark as Complete
+              </Link>
+            ) : file.status === "sold" && nextStep ? (
+              <Link
+                href={`/admin/files/${file.id}#${nextStep}-step`}
+                className="admin-btn h-12 px-5 text-base"
+              >
+                Add Missing Info
+              </Link>
+            ) : (
+              <form action={markListingSoldAction}>
+                <input type="hidden" name="listingId" value={file.id} />
+                <button
+                  type="submit"
+                  className="admin-btn h-12 px-5 text-base"
+                  disabled={file.status === "sold"}
+                >
+                  {file.status === "sold" ? "Sold" : "Mark as Sold"}
+                </button>
+              </form>
+            )}
           </div>
         </section>
 
-        <FileWorkspace file={file} />
+        <FileWorkspace file={file} savedStep={saved} />
       </div>
     </AdminShell>
   );

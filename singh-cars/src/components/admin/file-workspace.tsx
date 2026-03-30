@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   CarFront,
@@ -131,6 +131,22 @@ function formatPrice(value?: number | string | null) {
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(numericValue);
+}
+
+function hasDisplayValue(value: ReactNode) {
+  if (value === null || value === undefined || value === false) {
+    return false;
+  }
+
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+
+  if (typeof value === "string") {
+    return value.trim().length > 0;
+  }
+
+  return true;
 }
 
 function parseBuyerNotes(notes?: string | null) {
@@ -803,43 +819,41 @@ function ProgressStep({
   label,
   active,
   done,
+  disabled = false,
+  onClick,
 }: {
   label: string;
   active: boolean;
   done: boolean;
+  disabled?: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
       className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
         active
           ? "border-black bg-black text-white"
           : done
-            ? "border-gray-300 bg-gray-50 text-black"
+            ? "border-green-200 bg-green-50 text-green-700"
             : "border-gray-200 bg-white text-gray-600"
-      }`}
+      } ${disabled ? "cursor-not-allowed opacity-50" : "hover:border-gray-300 hover:bg-gray-50"}`}
     >
       <span
         className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs ${
           active
             ? "border-white/30 bg-white/10 text-white"
             : done
-              ? "border-gray-300 bg-white text-black"
+              ? "border-green-200 bg-white text-green-700"
               : "border-gray-200 bg-white text-gray-500"
         }`}
       >
         {done ? <Check className="h-4 w-4" /> : label.charAt(0)}
       </span>
       {label}
-    </div>
-  );
-}
-
-function SummaryLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500">{label}</p>
-      <p className="mt-1 text-sm font-medium text-black">{value}</p>
-    </div>
+    </button>
   );
 }
 
@@ -862,11 +876,13 @@ function SectionView({
   title,
   text,
   onEdit,
+  actionLabel,
   children,
 }: {
   title: string;
   text: string;
   onEdit: () => void;
+  actionLabel: string;
   children: ReactNode;
 }) {
   return (
@@ -876,8 +892,8 @@ function SectionView({
           <p className="text-base font-semibold text-black">{title}</p>
           <p className="mt-1 text-sm text-gray-600">{text}</p>
         </div>
-        <button type="button" className="admin-btn admin-btn-sm" onClick={onEdit}>
-          Edit
+        <button type="button" className="admin-btn h-11 px-4 text-sm" onClick={onEdit}>
+          {actionLabel}
         </button>
       </div>
       {children}
@@ -888,8 +904,8 @@ function SectionView({
 function StepShell({
   icon,
   title,
-  summary,
-  emptyText,
+  description,
+  stateLabel,
   actionLabel,
   isOpen,
   onToggle,
@@ -897,8 +913,8 @@ function StepShell({
 }: {
   icon: ReactNode;
   title: string;
-  summary: ReactNode;
-  emptyText: string;
+  description: string;
+  stateLabel: string;
   actionLabel: string;
   isOpen: boolean;
   onToggle: () => void;
@@ -918,13 +934,12 @@ function StepShell({
             </div>
             <div>
               <p className="text-lg font-semibold text-black">{title}</p>
-              <p className="text-sm text-gray-600">{emptyText}</p>
+              <p className="text-sm text-gray-600">{description}</p>
             </div>
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">{summary}</div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="admin-btn h-12 px-5 text-sm">{actionLabel}</span>
+          <span className="admin-btn h-12 px-5 text-sm">{stateLabel || actionLabel}</span>
           <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-black">
             <ChevronDown className={`h-5 w-5 transition ${isOpen ? "rotate-180" : ""}`} />
           </span>
@@ -1103,13 +1118,14 @@ function PhotoCard({
   const [isPending, startTransition] = useTransition();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const displayLabel = isCover ? "Cover photo" : "Photo";
 
   return (
     <>
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <button type="button" className="block w-full" onClick={() => setPreviewOpen(true)}>
+        <button type="button" className="block w-full text-left" onClick={() => setPreviewOpen(true)}>
           {imageFailed ? (
-            <div className="flex h-28 w-full items-center justify-center bg-gray-50 text-sm font-medium text-gray-500">
+            <div className="flex h-40 w-full items-center justify-center bg-gray-50 text-sm font-medium text-gray-500">
               Photo unavailable
             </div>
           ) : (
@@ -1117,70 +1133,24 @@ function PhotoCard({
             <img
               src={image.imageUrl}
               alt="Car photo"
-              className="h-28 w-full object-cover"
+              className="h-40 w-full object-cover"
               onError={() => setImageFailed(true)}
             />
           )}
         </button>
-        <div className="grid gap-3 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-black">{getFileName(image.imageUrl)}</p>
-              <p className="mt-1 text-xs text-gray-500">Car photo</p>
-            </div>
-            {isCover ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-                <Star className="h-3.5 w-3.5 fill-current" />
-                Cover
-              </span>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <a href={image.imageUrl} target="_blank" rel="noreferrer" className="admin-btn admin-btn-sm">
-              Open
-            </a>
-            <button
-              type="button"
-              className="admin-btn admin-btn-sm"
-              disabled={isPending || isCover}
-              onClick={() =>
-                startTransition(async () => {
-                  const formData = new FormData();
-                  formData.set("listingId", listingId);
-                  formData.set("imageId", image.id);
-                  const result = (await setListingCoverImageAction(formData)) as RemoveResult;
-
-                  if (result.success) {
-                    onSetCover(image.id, image.imageUrl);
-                  }
-                })
-              }
-            >
-              {isCover ? "Main Cover" : "Set as Cover"}
-            </button>
-            <button
-              type="button"
-              className="admin-btn admin-btn-sm"
-              disabled={isPending}
-              onClick={() =>
-                startTransition(async () => {
-                  const formData = new FormData();
-                  formData.set("listingId", listingId);
-                  formData.set("imageId", image.id);
-                  const result = (await removeListingImageByIdAction(formData)) as RemoveResult;
-
-                  if (result.success) {
-                    onRemove(image.id);
-                  }
-                })
-              }
-            >
-              Remove
-            </button>
-          </div>
+        <div className="flex items-center justify-between gap-3 p-3">
+          <p className="text-sm font-semibold text-black">{displayLabel}</p>
+          {isCover ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+              <Star className="h-3.5 w-3.5 fill-current" />
+              Cover
+            </span>
+          ) : (
+            <span className="text-xs font-medium text-gray-500">Tap to preview</span>
+          )}
         </div>
       </div>
-      {previewOpen && !imageFailed ? (
+      {previewOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4">
           <button
             type="button"
@@ -1190,7 +1160,7 @@ function PhotoCard({
           />
           <div className="relative z-10 w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-              <p className="truncate text-sm font-semibold text-black">{getFileName(image.imageUrl)}</p>
+              <p className="truncate text-sm font-semibold text-black">{displayLabel}</p>
               <button
                 type="button"
                 className="admin-btn admin-btn-sm"
@@ -1200,8 +1170,58 @@ function PhotoCard({
               </button>
             </div>
             <div className="bg-black">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={image.imageUrl} alt="Car photo" className="max-h-[80vh] w-full object-contain" />
+              {imageFailed ? (
+                <div className="flex min-h-[320px] items-center justify-center bg-gray-950 text-sm font-medium text-white/80">
+                  Photo preview is not available
+                </div>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={image.imageUrl} alt="Car photo" className="max-h-[70vh] w-full object-contain" />
+              )}
+            </div>
+            <div className="flex flex-wrap gap-3 border-t border-gray-200 px-4 py-4">
+              <a href={image.imageUrl} target="_blank" rel="noreferrer" className="admin-btn admin-btn-sm">
+                Open Full Image
+              </a>
+              <button
+                type="button"
+                className="admin-btn admin-btn-sm"
+                disabled={isPending || isCover}
+                onClick={() =>
+                  startTransition(async () => {
+                    const formData = new FormData();
+                    formData.set("listingId", listingId);
+                    formData.set("imageId", image.id);
+                    const result = (await setListingCoverImageAction(formData)) as RemoveResult;
+
+                    if (result.success) {
+                      onSetCover(image.id, image.imageUrl);
+                    }
+                  })
+                }
+              >
+                {isCover ? "Main Cover" : "Set as Cover"}
+              </button>
+              <button
+                type="button"
+                className="admin-btn admin-btn-sm"
+                disabled={isPending}
+                onClick={() =>
+                  startTransition(async () => {
+                    const formData = new FormData();
+                    formData.set("listingId", listingId);
+                    formData.set("imageId", image.id);
+                    const result = (await removeListingImageByIdAction(formData)) as RemoveResult;
+
+                    if (result.success) {
+                      onRemove(image.id);
+                      setPreviewOpen(false);
+                    }
+                  })
+                }
+              >
+                Remove
+              </button>
             </div>
           </div>
         </div>
@@ -1210,7 +1230,13 @@ function PhotoCard({
   );
 }
 
-export function FileWorkspace({ file }: { file: AdminFileRecord }) {
+export function FileWorkspace({
+  file,
+  savedStep,
+}: {
+  file: AdminFileRecord;
+  savedStep?: string;
+}) {
   const buyerFields = useMemo(
     () => parseBuyerNotes(file.listing.buyer?.notes),
     [file.listing.buyer?.notes],
@@ -1293,32 +1319,95 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
   const isSellerEditing = activeStep === "seller" && editingStep === "seller";
   const isCarEditing = activeStep === "car" && editingStep === "car";
   const isBuyerEditing = activeStep === "buyer" && editingStep === "buyer";
+  const sellerSectionRef = useRef<HTMLDivElement | null>(null);
+  const carSectionRef = useRef<HTMLDivElement | null>(null);
+  const buyerSectionRef = useRef<HTMLDivElement | null>(null);
+
+  function openStep(step: FileStep, edit = false) {
+    setActiveStep(step);
+    setEditingStep(edit ? step : null);
+
+    const nextRef =
+      step === "seller"
+        ? sellerSectionRef
+        : step === "car"
+          ? carSectionRef
+          : buyerSectionRef;
+
+    window.setTimeout(() => {
+      nextRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+  }
+
+  useEffect(() => {
+    if (!savedStep) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (savedStep === "seller") {
+        openStep("car", true);
+        return;
+      }
+
+      if (savedStep === "car") {
+        if (showBuyerStep) {
+          openStep("buyer", !buyerDone);
+        } else {
+          openStep("car", false);
+        }
+        return;
+      }
+
+      if (savedStep === "buyer" || savedStep === "status") {
+        openStep(showBuyerStep ? "buyer" : "car", showBuyerStep && !buyerDone);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [savedStep, showBuyerStep, buyerDone]);
 
   return (
     <div className="grid gap-5">
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          <ProgressStep label="Seller" active={activeStep === "seller"} done={sellerDone} />
+          <ProgressStep
+            label="Seller"
+            active={activeStep === "seller"}
+            done={sellerDone}
+            onClick={() => openStep("seller", !sellerDone)}
+          />
           <span className="text-gray-300">→</span>
-          <ProgressStep label="Car" active={activeStep === "car"} done={carDone} />
+          <ProgressStep
+            label="Car"
+            active={activeStep === "car"}
+            done={carDone}
+            onClick={() => openStep("car", !carDone)}
+          />
           <span className="text-gray-300">→</span>
-          <ProgressStep label="Buyer" active={activeStep === "buyer"} done={buyerDone} />
+          <ProgressStep
+            label="Buyer"
+            active={activeStep === "buyer"}
+            done={buyerDone}
+            disabled={!showBuyerStep}
+            onClick={() => {
+              if (showBuyerStep) {
+                openStep("buyer", !buyerDone);
+              }
+            }}
+          />
         </div>
       </section>
 
+      <div id="seller-step" ref={sellerSectionRef}>
       <StepShell
         icon={<CircleUserRound className="h-5 w-5" />}
         title="Step 1 — Seller"
-        emptyText={sellerDone ? "Seller details are ready." : "No seller added"}
-        actionLabel={sellerDone ? "Saved" : "+ Add Seller"}
+        description={sellerDone ? "Seller details saved." : "Add seller name and phone first."}
+        stateLabel={sellerDone ? "Done" : "Add Info"}
+        actionLabel={sellerDone ? "Done" : "+ Add Seller"}
         isOpen={activeStep === "seller"}
-        onToggle={() => setActiveStep("seller")}
-        summary={
-          <>
-            <SummaryLine label="Seller Name" value={sellerDraft.name.trim() || "No seller added"} />
-            <SummaryLine label="Phone" value={sellerDraft.phone.trim() || "No seller added"} />
-          </>
-        }
+        onToggle={() => openStep("seller", !sellerDone)}
       >
         {isSellerEditing ? (
           <form action={updateSellerInfoAction} className="grid gap-4">
@@ -1443,18 +1532,33 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
         ) : (
           <SectionView
             title="Seller info"
-            text="Saved seller details for this file."
+            text={sellerDone ? "Saved seller details for this file." : "Add seller details to continue."}
             onEdit={() => {
-              setActiveStep("seller");
-              setEditingStep("seller");
+              openStep("seller", true);
             }}
+            actionLabel={sellerDone ? "Edit Seller Details" : "Add Missing Info"}
           >
-            <div className="grid gap-2 sm:grid-cols-2">
-              <DetailRow label="Name" value={sellerDraft.name.trim() || "No seller added"} />
-              <DetailRow label="Phone" value={sellerDraft.phone.trim() || "No seller added"} />
-              <DetailRow label="Address" value={sellerDraft.address.trim() || "Not added"} />
-              <DetailRow label="Notes" value={sellerDraft.notes.trim() || "Not added"} />
-            </div>
+            {[
+              { label: "Name", value: sellerDraft.name.trim() },
+              { label: "Phone", value: sellerDraft.phone.trim() },
+              { label: "Address", value: sellerDraft.address.trim() },
+              { label: "Notes", value: sellerDraft.notes.trim() },
+            ].some((item) => hasDisplayValue(item.value)) ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[
+                  { label: "Name", value: sellerDraft.name.trim() },
+                  { label: "Phone", value: sellerDraft.phone.trim() },
+                  { label: "Address", value: sellerDraft.address.trim() },
+                  { label: "Notes", value: sellerDraft.notes.trim() },
+                ]
+                  .filter((item) => hasDisplayValue(item.value))
+                  .map((item) => (
+                    <DetailRow key={item.label} label={item.label} value={item.value} />
+                  ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600">Tap Add Missing Info to continue.</p>
+            )}
             <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
@@ -1508,31 +1612,17 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
           </SectionView>
         )}
       </StepShell>
+      </div>
 
+      <div id="car-step" ref={carSectionRef}>
       <StepShell
         icon={<CarFront className="h-5 w-5" />}
         title="Step 2 — Car"
-        emptyText={carDone ? "Car details are saved." : "No car details added"}
-        actionLabel={carDone ? "Saved" : "+ Add Car"}
+        description={carDone ? "Car details saved." : "Add the main car details and photos."}
+        stateLabel={carDone ? "Done" : "Add Info"}
+        actionLabel={carDone ? "Done" : "+ Add Car"}
         isOpen={activeStep === "car"}
-        onToggle={() => setActiveStep("car")}
-        summary={
-          <>
-            <SummaryLine label="Number Plate" value={carDraft.numberPlate.trim() || "No car details added"} />
-            <SummaryLine label="Model" value={carDraft.model.trim() || "No car details added"} />
-            <SummaryLine label="Price" value={formatPrice(carDraft.price)} />
-            <SummaryLine
-              label="Status"
-              value={
-                carDraft.status === "sold"
-                  ? "Sold"
-                  : carDraft.status === "booked"
-                    ? "Booked"
-                    : "Available"
-              }
-            />
-          </>
-        }
+        onToggle={() => openStep("car", !carDone)}
       >
         {isCarEditing ? (
           <form action={updateCarInfoAction} className="grid gap-4">
@@ -1577,7 +1667,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                 />
               </label>
               <label>
-                <span className="mb-2 block text-sm font-semibold text-gray-800">Variant</span>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Model Type</span>
                 <input
                   className="admin-field h-12"
                   name="variant"
@@ -1626,7 +1716,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                 />
               </label>
               <label>
-                <span className="mb-2 block text-sm font-semibold text-gray-800">Transmission</span>
+                <span className="mb-2 block text-sm font-semibold text-gray-800">Gear</span>
                 <input
                   className="admin-field h-12"
                   name="transmission"
@@ -1705,7 +1795,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                   />
                 </label>
                 <label className="md:col-span-2">
-                  <span className="mb-2 block text-sm font-semibold text-gray-800">Notes / Description</span>
+                  <span className="mb-2 block text-sm font-semibold text-gray-800">Notes</span>
                   <textarea
                     className="admin-field min-h-[110px]"
                     name="description"
@@ -1827,7 +1917,7 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                 </div>
 
                 {carPhotos.length ? (
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     {carPhotos.map((image) => (
                       <PhotoCard
                         key={image.id}
@@ -1876,38 +1966,67 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
         ) : (
           <SectionView
             title="Car info"
-            text="Saved car details for this file."
+            text={carDone ? "Saved car details for this file." : "Add car details to continue."}
             onEdit={() => {
-              setActiveStep("car");
-              setEditingStep("car");
+              openStep("car", true);
             }}
+            actionLabel={carDone ? "Edit Car Details" : "Add Missing Info"}
           >
-            <div className="grid gap-2 sm:grid-cols-2">
-              <DetailRow label="Number Plate" value={carDraft.numberPlate.trim() || "Not added"} />
-              <DetailRow label="Make" value={carDraft.make.trim() || "Not added"} />
-              <DetailRow label="Model" value={carDraft.model.trim() || "Not added"} />
-              <DetailRow label="Variant" value={carDraft.variant.trim() || "Not added"} />
-              <DetailRow label="Year" value={carDraft.year.trim() || "Not added"} />
-              <DetailRow label="KM" value={carDraft.kmDriven.trim() || "Not added"} />
-              <DetailRow label="Fuel" value={carDraft.fuel.trim() || "Not added"} />
-              <DetailRow label="Transmission" value={carDraft.transmission.trim() || "Not added"} />
-              <DetailRow label="Price" value={formatPrice(carDraft.price)} />
-              <DetailRow
-                label="Status"
-                value={
+            {[
+              { label: "Number Plate", value: carDraft.numberPlate.trim() },
+              { label: "Make", value: carDraft.make.trim() },
+              { label: "Model", value: carDraft.model.trim() },
+              { label: "Model Type", value: carDraft.variant.trim() },
+              { label: "Year", value: carDraft.year.trim() },
+              { label: "KM", value: carDraft.kmDriven.trim() },
+              { label: "Fuel", value: carDraft.fuel.trim() },
+              { label: "Gear", value: carDraft.transmission.trim() },
+              { label: "Price", value: Number(carDraft.price || 0) ? formatPrice(carDraft.price) : "" },
+              {
+                label: "Status",
+                value:
                   carDraft.status === "sold"
                     ? "Sold"
                     : carDraft.status === "booked"
                       ? "Booked"
-                      : "Available"
-                }
-              />
-              <DetailRow label="Color" value={carDraft.color.trim() || "Not added"} />
-              <DetailRow label="Location" value={carDraft.location.trim() || "Not added"} />
-            </div>
-            <div className="grid gap-2">
-              <DetailRow label="Description" value={carDraft.description.trim() || "Not added"} />
-            </div>
+                      : "Available",
+              },
+              { label: "Color", value: carDraft.color.trim() },
+              { label: "Location", value: carDraft.location.trim() },
+              { label: "Notes", value: carDraft.description.trim() },
+            ].some((item) => hasDisplayValue(item.value)) ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[
+                  { label: "Number Plate", value: carDraft.numberPlate.trim() },
+                  { label: "Make", value: carDraft.make.trim() },
+                  { label: "Model", value: carDraft.model.trim() },
+                  { label: "Model Type", value: carDraft.variant.trim() },
+                  { label: "Year", value: carDraft.year.trim() },
+                  { label: "KM", value: carDraft.kmDriven.trim() },
+                  { label: "Fuel", value: carDraft.fuel.trim() },
+                  { label: "Gear", value: carDraft.transmission.trim() },
+                  { label: "Price", value: Number(carDraft.price || 0) ? formatPrice(carDraft.price) : "" },
+                  {
+                    label: "Status",
+                    value:
+                      carDraft.status === "sold"
+                        ? "Sold"
+                        : carDraft.status === "booked"
+                          ? "Booked"
+                          : "Available",
+                  },
+                  { label: "Color", value: carDraft.color.trim() },
+                  { label: "Location", value: carDraft.location.trim() },
+                  { label: "Notes", value: carDraft.description.trim() },
+                ]
+                  .filter((item) => hasDisplayValue(item.value))
+                  .map((item) => (
+                    <DetailRow key={item.label} label={item.label} value={item.value} />
+                  ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600">Tap Add Missing Info to continue.</p>
+            )}
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <div>
@@ -2043,26 +2162,18 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
           </SectionView>
         )}
       </StepShell>
+      </div>
 
       {showBuyerStep ? (
+        <div id="buyer-step" ref={buyerSectionRef}>
         <StepShell
           icon={<IndianRupee className="h-5 w-5" />}
           title="Step 3 — Buyer"
-          emptyText={buyerDone ? "Buyer details are saved." : "No buyer added"}
-          actionLabel={buyerDone ? "Saved" : "+ Add Buyer"}
+          description={buyerDone ? "Buyer details saved." : "Add buyer details when the car is sold."}
+          stateLabel={buyerDone ? "Done" : "Add Info"}
+          actionLabel={buyerDone ? "Done" : "+ Add Buyer"}
           isOpen={activeStep === "buyer"}
-          onToggle={() => setActiveStep("buyer")}
-          summary={
-            <>
-              <SummaryLine label="Buyer Name" value={buyerDraft.name.trim() || "No buyer added"} />
-              <SummaryLine label="Phone" value={buyerDraft.phone.trim() || "No buyer added"} />
-              <SummaryLine label="Sold Price" value={formatPrice(buyerDraft.soldPrice)} />
-              <SummaryLine
-                label="Docs"
-                value={buyerDocs.length ? `${buyerDocs.length} files added` : "No buyer docs uploaded yet"}
-              />
-            </>
-          }
+          onToggle={() => openStep("buyer", !buyerDone)}
         >
           {isBuyerEditing ? (
             <form action={updateBuyerInfoAction} className="grid gap-4">
@@ -2207,24 +2318,41 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                 </button>
               </div>
             </form>
-          ) : (
-            <SectionView
-              title="Buyer info"
-              text="Saved buyer details for this file."
-              onEdit={() => {
-                setActiveStep("buyer");
-                setEditingStep("buyer");
-              }}
-            >
+        ) : (
+          <SectionView
+            title="Buyer info"
+            text={buyerDone ? "Saved buyer details for this file." : "Add buyer details after the sale."}
+            onEdit={() => {
+              openStep("buyer", true);
+            }}
+            actionLabel={buyerDone ? "Edit Buyer Details" : "Add Missing Info"}
+          >
+            {[
+              { label: "Name", value: buyerDraft.name.trim() },
+              { label: "Phone", value: buyerDraft.phone.trim() },
+              { label: "Sold Price", value: Number(buyerDraft.soldPrice || 0) ? formatPrice(buyerDraft.soldPrice) : "" },
+              { label: "Sale Date", value: buyerDraft.saleDate },
+              { label: "Address", value: buyerDraft.address.trim() },
+              { label: "Notes", value: buyerDraft.notes.trim() },
+            ].some((item) => hasDisplayValue(item.value)) ? (
               <div className="grid gap-2 sm:grid-cols-2">
-                <DetailRow label="Name" value={buyerDraft.name.trim() || "No buyer added"} />
-                <DetailRow label="Phone" value={buyerDraft.phone.trim() || "No buyer added"} />
-                <DetailRow label="Sold Price" value={formatPrice(buyerDraft.soldPrice)} />
-                <DetailRow label="Sale Date" value={buyerDraft.saleDate || "Not added"} />
-                <DetailRow label="Address" value={buyerDraft.address.trim() || "Not added"} />
-                <DetailRow label="Notes" value={buyerDraft.notes.trim() || "Not added"} />
+                {[
+                  { label: "Name", value: buyerDraft.name.trim() },
+                  { label: "Phone", value: buyerDraft.phone.trim() },
+                  { label: "Sold Price", value: Number(buyerDraft.soldPrice || 0) ? formatPrice(buyerDraft.soldPrice) : "" },
+                  { label: "Sale Date", value: buyerDraft.saleDate },
+                  { label: "Address", value: buyerDraft.address.trim() },
+                  { label: "Notes", value: buyerDraft.notes.trim() },
+                ]
+                  .filter((item) => hasDisplayValue(item.value))
+                  .map((item) => (
+                    <DetailRow key={item.label} label={item.label} value={item.value} />
+                  ))}
               </div>
-              <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+            ) : (
+              <p className="text-sm text-gray-600">Tap Add Missing Info to continue.</p>
+            )}
+            <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-black">Buyer documents</p>
@@ -2273,10 +2401,11 @@ export function FileWorkspace({ file }: { file: AdminFileRecord }) {
                     No buyer docs uploaded yet
                   </div>
                 )}
-              </div>
-            </SectionView>
-          )}
-        </StepShell>
+            </div>
+          </SectionView>
+        )}
+      </StepShell>
+        </div>
       ) : null}
     </div>
   );

@@ -692,7 +692,7 @@ export async function updateCarInfoAction(formData: FormData) {
     throw new Error(`Car save failed: ${error.message}`);
   }
 
-  return redirectToAdminHome(listingId, "car");
+  return redirectToAdminFile(listingId, "car");
 }
 
 export async function markListingSoldAction(formData: FormData) {
