@@ -50,7 +50,7 @@ export async function AdminShell({
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
-      <div className="mx-auto flex min-h-screen max-w-[1680px] gap-4 px-3 py-3 pb-24 lg:px-4 lg:pb-3">
+      <div className="mx-auto flex min-h-screen max-w-[1680px] gap-4 px-3 py-3 pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:px-4 lg:pb-4">
         <aside className="flex w-[220px] shrink-0 flex-col justify-between rounded-xl border border-gray-200 bg-white p-4 shadow-sm max-lg:hidden">
           <div className="grid gap-5">
             <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3">
@@ -86,7 +86,7 @@ export async function AdminShell({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-gray-500">
                   Singh Car Bazar
                 </p>
-                <h1 className="mt-1 text-lg font-semibold text-black sm:text-xl">
+                <h1 className="mt-1 text-base font-semibold text-black sm:text-xl">
                   Easy car files for seller, car, and buyer
                 </h1>
                 <p className="mt-2 text-sm text-gray-600 max-sm:hidden">
