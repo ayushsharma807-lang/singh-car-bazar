@@ -418,6 +418,7 @@ async function fetchListingsFromSupabase({
       throw new Error(error?.message || "Could not load admin listings.");
     }
 
+    console.error("Public listings could not load from Supabase.", error?.message || "No data returned.");
     return null;
   }
 
@@ -429,6 +430,10 @@ export async function getListings(filters: InventoryFilters = {}) {
   const listings = await fetchListingsFromSupabase({ filters });
   if (listings) {
     return listings.filter((listing) => getPublicListingStatus(listing).ready);
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return [];
   }
 
   return applyInventoryFilters(

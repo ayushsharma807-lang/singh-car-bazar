@@ -160,6 +160,36 @@ async function deletePublicFile(bucket: string, publicUrl: string | null | undef
   await supabase.storage.from(bucket).remove([path]);
 }
 
+async function syncListingCoverAfterRemoval(
+  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  listingId: string,
+  removedImageUrl: string,
+) {
+  const { data: listing } = await supabase
+    .from("listings")
+    .select("cover_image_url")
+    .eq("id", listingId)
+    .maybeSingle();
+
+  const { data: remainingImages } = await supabase
+    .from("listing_images")
+    .select("image_url,sort_order")
+    .eq("listing_id", listingId)
+    .order("sort_order", { ascending: true });
+
+  const nextCoverImageUrl =
+    listing?.cover_image_url === removedImageUrl
+      ? remainingImages?.[0]?.image_url ?? null
+      : listing?.cover_image_url ?? null;
+
+  await supabase
+    .from("listings")
+    .update({
+      cover_image_url: nextCoverImageUrl,
+    })
+    .eq("id", listingId);
+}
+
 function buildBuyerNotes(address: string, notes: string) {
   const cleanAddress = address.trim();
   const cleanNotes = notes.trim();
@@ -496,15 +526,25 @@ export async function saveListingAction(
 
   const buyerName = String(formData.get("buyerName") || "");
   const buyerPhone = String(formData.get("buyerPhone") || "");
+  const buyerNotes = String(formData.get("buyerNotes") || "");
+  const soldPrice = Number(formData.get("soldPrice") || 0) || null;
+  const saleDate = String(formData.get("saleDate") || "") || null;
+  const hasBuyerData = Boolean(
+    buyerName.trim() ||
+      buyerPhone.trim() ||
+      buyerNotes.trim() ||
+      soldPrice ||
+      saleDate,
+  );
 
-  if (buyerName || buyerPhone) {
+  if (hasBuyerData) {
     const { error: buyerError } = await saveBuyerRecord(supabase, {
       listing_id: listingId,
       name: buyerName || null,
       phone: buyerPhone || null,
-      notes: String(formData.get("buyerNotes") || "") || null,
-      sold_price: Number(formData.get("soldPrice") || 0) || null,
-      sale_date: String(formData.get("saleDate") || "") || null,
+      notes: buyerNotes || null,
+      sold_price: soldPrice,
+      sale_date: saleDate,
     });
 
     if (buyerError) {
@@ -651,6 +691,13 @@ export async function updateCarInfoAction(formData: FormData) {
     `FILE-${listingId.slice(0, 8).toUpperCase()}`;
   const location =
     String(formData.get("location") || "").trim() || existingListing.location || "Jalandhar";
+  const ownerCountRaw = formData.get("ownerCount");
+  const ownerCount =
+    ownerCountRaw === null
+      ? existingListing.owner_count
+      : String(ownerCountRaw).trim()
+        ? Number(ownerCountRaw) || null
+        : null;
 
   const updatePayload = {
     stock_number: stockNumber,
@@ -679,7 +726,7 @@ export async function updateCarInfoAction(formData: FormData) {
     featured: existingListing.featured,
     cover_image_url: existingListing.cover_image_url,
     seller_type: existingListing.seller_type,
-    owner_count: existingListing.owner_count,
+    owner_count: ownerCount,
   };
 
   const { error } = await supabase
@@ -851,21 +898,17 @@ export async function removeListingImageAction(formData: FormData) {
     .eq("id", imageId)
     .maybeSingle();
 
-  if (image?.image_url) {
-    await deletePublicFile("listing-photos", image.image_url);
+  const removedImageUrl = image?.image_url ?? null;
+
+  if (removedImageUrl) {
+    await deletePublicFile("listing-photos", removedImageUrl);
   }
 
   await supabase.from("listing_images").delete().eq("id", imageId);
 
-  const { data: remainingImages } = await supabase
-    .from("listing_images")
-    .select("image_url,sort_order")
-    .eq("listing_id", listingId)
-    .order("sort_order", { ascending: true });
-
-  await supabase.from("listings").update({
-    cover_image_url: remainingImages?.[0]?.image_url ?? null,
-  }).eq("id", listingId);
+  if (removedImageUrl) {
+    await syncListingCoverAfterRemoval(supabase, listingId, removedImageUrl);
+  }
 
   await redirectToAdminFile(listingId);
 }
@@ -968,7 +1011,7 @@ export async function uploadDocumentInlineAction(formData: FormData) {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   ];
 
-  const hasAllowedExtension = [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".doc", ".docx"]
+  const hasAllowedExtension = [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".doc", ".docx"]
     .some((extension) => file.name.toLowerCase().endsWith(extension));
 
   if (!allowedTypes.includes(file.type) && !hasAllowedExtension) {
@@ -1241,7 +1284,9 @@ export async function removeListingImageByIdAction(formData: FormData) {
     };
   }
 
-  await deletePublicFile("listing-photos", image.image_url);
+  const removedImageUrl = image.image_url;
+
+  await deletePublicFile("listing-photos", removedImageUrl);
   const { error } = await supabase.from("listing_images").delete().eq("id", imageId);
 
   if (error) {
@@ -1251,18 +1296,7 @@ export async function removeListingImageByIdAction(formData: FormData) {
     };
   }
 
-  const { data: remainingImages } = await supabase
-    .from("listing_images")
-    .select("image_url,sort_order")
-    .eq("listing_id", listingId)
-    .order("sort_order", { ascending: true });
-
-  await supabase
-    .from("listings")
-    .update({
-      cover_image_url: remainingImages?.[0]?.image_url ?? null,
-    })
-    .eq("id", listingId);
+  await syncListingCoverAfterRemoval(supabase, listingId, removedImageUrl);
 
   await revalidateAdminFilePaths(listingId);
 
