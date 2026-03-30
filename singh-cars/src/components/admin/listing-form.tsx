@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
+import { Check, ChevronRight, FileImage, FileText, UserRound } from "lucide-react";
 import { saveListingAction, type SaveListingActionState } from "@/app/admin/actions";
 import type { Listing } from "@/types";
 
@@ -8,35 +9,57 @@ type ListingFormProps = {
   listing?: Listing | null;
 };
 
-type Step = "seller" | "car" | "save";
+type Step = "seller" | "car" | "buyer";
 
-const stepOrder: Step[] = ["seller", "car", "save"];
+const stepOrder: Step[] = ["seller", "car", "buyer"];
+const documentAccept = ".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx";
 
-const documentFields = [
-  { label: "RC", name: "document_rc" },
-  { label: "Insurance", name: "document_insurance" },
-  { label: "Seller ID", name: "document_seller_id" },
-  { label: "Buyer ID", name: "document_buyer_id" },
-  { label: "Loan / NOC", name: "document_loan_noc" },
-  { label: "Other Files", name: "document_other" },
-];
+const carDocumentFields = [
+  { label: "RC", name: "document_rc", accept: documentAccept },
+  { label: "Insurance", name: "document_insurance", accept: documentAccept },
+  { label: "Other Papers", name: "document_other", accept: documentAccept },
+] as const;
 
-const stepMeta: Record<Step, { title: string; text: string }> = {
+const stepMeta: Record<Step, { title: string; text: string; icon: typeof UserRound }> = {
   seller: {
-    title: "Step 1: Seller",
-    text: "Add the seller name and phone first.",
+    title: "Seller",
+    text: "Name, phone, and seller papers",
+    icon: UserRound,
   },
   car: {
-    title: "Step 2: Car",
-    text: "Add the main car details and photos.",
+    title: "Car",
+    text: "Car details, photos, and papers",
+    icon: FileImage,
   },
-  save: {
-    title: "Step 3: Save",
-    text: "Check the details and save the car file.",
+  buyer: {
+    title: "Buyer",
+    text: "Buyer details and buyer papers",
+    icon: FileText,
   },
 };
 
-function StepButton({
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <span className="mb-2 block text-sm font-semibold text-gray-800">{children}</span>;
+}
+
+function parseBuyerNotes(notes?: string | null) {
+  if (!notes) {
+    return { address: "", notes: "" };
+  }
+
+  if (!notes.startsWith("Address: ")) {
+    return { address: "", notes };
+  }
+
+  const [firstLine, ...rest] = notes.split("\n");
+
+  return {
+    address: firstLine.replace("Address: ", "").trim(),
+    notes: rest.join("\n").trim(),
+  };
+}
+
+function StepPill({
   step,
   activeStep,
   onClick,
@@ -46,326 +69,420 @@ function StepButton({
   onClick: (step: Step) => void;
 }) {
   const isActive = step === activeStep;
+  const isDone = stepOrder.indexOf(step) < stepOrder.indexOf(activeStep);
+  const Icon = stepMeta[step].icon;
 
   return (
     <button
       type="button"
       onClick={() => onClick(step)}
-      className={`rounded-xl border px-5 py-4 text-left transition ${
+      className={`flex min-w-0 items-center gap-2 rounded-full border px-3 py-2 text-left text-sm font-semibold transition ${
         isActive
-          ? "border-gray-300 bg-gray-50 shadow-sm"
-          : "border-gray-200 bg-white hover:bg-gray-50"
+          ? "border-black bg-black text-white"
+          : isDone
+            ? "border-green-200 bg-green-50 text-green-700"
+            : "border-gray-200 bg-white text-gray-600"
       }`}
     >
-      <p className="text-base font-semibold text-black">{stepMeta[step].title}</p>
-      <p className="mt-1 text-sm text-gray-600">{stepMeta[step].text}</p>
+      <span
+        className={`flex h-7 w-7 items-center justify-center rounded-full border ${
+          isActive
+            ? "border-white/20 bg-white/10 text-white"
+            : isDone
+              ? "border-green-200 bg-white text-green-700"
+              : "border-gray-200 bg-white text-gray-500"
+        }`}
+      >
+        {isDone ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+      </span>
+      <span className="truncate">{stepMeta[step].title}</span>
     </button>
   );
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <span className="mb-2 block text-sm font-semibold text-gray-800">{children}</span>;
-}
-
-function NextStepButton({
-  currentStep,
-  setStep,
+function UploadCard({
+  label,
+  helper,
+  name,
+  accept,
+  multiple = false,
+  selectedText,
+  onFilesChange,
 }: {
-  currentStep: Step;
-  setStep: (step: Step) => void;
+  label: string;
+  helper: string;
+  name: string;
+  accept: string;
+  multiple?: boolean;
+  selectedText?: string;
+  onFilesChange: (name: string, files: FileList | null) => void;
 }) {
-  const currentIndex = stepOrder.indexOf(currentStep);
-  const nextStep = stepOrder[currentIndex + 1];
-
-  if (!nextStep) {
-    return null;
-  }
-
   return (
-    <button
-      type="button"
-      onClick={() => setStep(nextStep)}
-      className="admin-btn"
-    >
-      Next
-    </button>
+    <label className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+      <div>
+        <p className="text-sm font-semibold text-black">{label}</p>
+        <p className="mt-1 text-sm text-gray-600">{selectedText || helper}</p>
+      </div>
+      <span className="inline-flex min-h-12 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-black">
+        {multiple ? "Choose Files" : "Choose File"}
+      </span>
+      <input
+        type="file"
+        name={name}
+        accept={accept}
+        multiple={multiple}
+        className="sr-only"
+        onChange={(event) => onFilesChange(name, event.target.files)}
+      />
+    </label>
   );
 }
 
 export function ListingForm({ listing }: ListingFormProps) {
-  const [step, setStep] = useState<Step>("seller");
-  const coverImageUrl = listing?.coverImageUrl ?? "";
+  const formRef = useRef<HTMLFormElement | null>(null);
   const isEditing = Boolean(listing);
   const defaultStatus = listing?.status ?? "available";
+  const buyerDraft = parseBuyerNotes(listing?.buyer?.notes);
   const initialState: SaveListingActionState = { status: "idle" };
   const [state, formAction, isPending] = useActionState(saveListingAction, initialState);
+  const [step, setStep] = useState<Step>("seller");
+  const [localMessage, setLocalMessage] = useState<string>("");
+  const [selectedFiles, setSelectedFiles] = useState<Record<string, string>>({});
+
+  function goToStep(nextStep: Step) {
+    setLocalMessage("");
+    setStep(nextStep);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function updateFileLabel(name: string, files: FileList | null) {
+    if (!files?.length) {
+      setSelectedFiles((current) => {
+        const next = { ...current };
+        delete next[name];
+        return next;
+      });
+      return;
+    }
+
+    const label =
+      files.length === 1 ? files[0].name : `${files.length} files selected`;
+
+    setSelectedFiles((current) => ({
+      ...current,
+      [name]: label,
+    }));
+  }
+
+  function readField(name: string) {
+    if (!formRef.current) {
+      return "";
+    }
+
+    const formData = new FormData(formRef.current);
+    return String(formData.get(name) || "").trim();
+  }
+
+  function continueFromSeller() {
+    const sellerName = readField("sellerName");
+    const sellerPhone = readField("sellerPhone");
+
+    if (!sellerName || !sellerPhone) {
+      setLocalMessage("Add seller name and phone first.");
+      return;
+    }
+
+    goToStep("car");
+  }
+
+  function continueFromCar() {
+    const make = readField("make");
+    const model = readField("model");
+    const numberPlate = readField("numberPlate");
+    const price = readField("price");
+
+    if (!make || !model || !numberPlate || !price) {
+      setLocalMessage("Add car name, number plate, and price first.");
+      return;
+    }
+
+    goToStep("buyer");
+  }
 
   return (
     <form
+      ref={formRef}
       action={formAction}
-      className="grid gap-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm lg:p-6"
+      className="grid gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"
     >
       <input type="hidden" name="listingId" value={listing?.id ?? ""} />
       <input type="hidden" name="status" value={defaultStatus} />
+      <input type="hidden" name="sellerType" value={listing?.sellerType ?? "dealer"} />
+      <input type="hidden" name="coverImageUrl" value={listing?.coverImageUrl ?? ""} />
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="flex flex-wrap items-center gap-2">
         {stepOrder.map((stepKey) => (
-          <StepButton key={stepKey} step={stepKey} activeStep={step} onClick={setStep} />
+          <StepPill key={stepKey} step={stepKey} activeStep={step} onClick={goToStep} />
         ))}
       </div>
 
-      <section className={step === "seller" ? "rounded-xl border border-gray-200 bg-white p-5" : "hidden"}>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500">Seller</p>
-          <h2 className="mt-2 text-2xl font-semibold text-black">Who is giving this car?</h2>
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
+      {localMessage ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+          {localMessage}
+        </div>
+      ) : null}
+
+      {state.message ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          {state.message}
+        </div>
+      ) : null}
+
+      {step === "seller" ? (
+        <section className="grid gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">Seller</p>
+            <h2 className="mt-1 text-2xl font-semibold text-black">Add seller details</h2>
+            <p className="mt-1 text-sm text-gray-600">Start with the seller name, phone, and papers.</p>
+          </div>
+
+          <div className="grid gap-4">
             <label>
-              <FieldLabel>Seller Type</FieldLabel>
-              <select className="admin-field h-14" name="sellerType" defaultValue={listing?.sellerType ?? "dealer"}>
-                <option value="dealer">Dealer</option>
-                <option value="private">Private</option>
-              </select>
-            </label>
-            <label>
-              <FieldLabel>Phone</FieldLabel>
+              <FieldLabel>Seller Name</FieldLabel>
               <input
-                className="admin-field h-14"
-                name="sellerPhone"
-                defaultValue={listing?.seller?.phone ?? ""}
-                placeholder="Seller phone number"
-              />
-            </label>
-            <label className="md:col-span-2">
-              <FieldLabel>Name</FieldLabel>
-              <input
-                className="admin-field h-14"
+                className="admin-field h-12"
                 name="sellerName"
                 defaultValue={listing?.seller?.name ?? ""}
                 placeholder="Seller name"
               />
             </label>
-          </div>
-
-          <details className="mt-5 rounded-xl border border-gray-200 bg-white p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-black">More details</summary>
-            <div className="mt-4 grid gap-4">
-              <label>
-                <FieldLabel>Address</FieldLabel>
-                <input
-                  className="admin-field h-14"
-                  name="sellerAddress"
-                  defaultValue={listing?.seller?.address ?? ""}
-                  placeholder="Optional address"
-                />
-              </label>
-              <label>
-                <FieldLabel>Notes</FieldLabel>
-                <textarea
-                  className="admin-field min-h-[120px]"
-                  name="sellerNotes"
-                  defaultValue={listing?.seller?.notes ?? ""}
-                  placeholder="Optional notes"
-                />
-              </label>
-            </div>
-          </details>
-
-          <div className="mt-6 flex justify-end">
-            <NextStepButton currentStep="seller" setStep={setStep} />
-          </div>
-      </section>
-
-      <section className={step === "car" ? "rounded-xl border border-gray-200 bg-white p-5" : "hidden"}>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500">Car</p>
-          <h2 className="mt-2 text-2xl font-semibold text-black">Add the car details</h2>
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label>
-              <FieldLabel>Make</FieldLabel>
-              <input className="admin-field h-14" name="make" defaultValue={listing?.make ?? ""} placeholder="Maruti, Hyundai, Honda..." />
+              <FieldLabel>Phone</FieldLabel>
+              <input
+                className="admin-field h-12"
+                name="sellerPhone"
+                defaultValue={listing?.seller?.phone ?? ""}
+                placeholder="Phone number"
+              />
+            </label>
+            <label>
+              <FieldLabel>Address</FieldLabel>
+              <input
+                className="admin-field h-12"
+                name="sellerAddress"
+                defaultValue={listing?.seller?.address ?? ""}
+                placeholder="Optional address"
+              />
+            </label>
+            <label>
+              <FieldLabel>Notes</FieldLabel>
+              <textarea
+                className="admin-field min-h-[96px]"
+                name="sellerNotes"
+                defaultValue={listing?.seller?.notes ?? ""}
+                placeholder="Optional notes"
+              />
+            </label>
+            <UploadCard
+              label="Upload Seller Docs"
+              helper="Pick seller papers now. They upload when you save the file."
+              name="document_seller_id"
+              accept={documentAccept}
+              selectedText={selectedFiles.document_seller_id}
+              onFilesChange={updateFileLabel}
+            />
+          </div>
+
+          <button type="button" onClick={continueFromSeller} className="admin-btn h-12 justify-center text-sm">
+            Save Seller & Continue
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </section>
+      ) : null}
+
+      {step === "car" ? (
+        <section className="grid gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">Car</p>
+            <h2 className="mt-1 text-2xl font-semibold text-black">Add car details</h2>
+            <p className="mt-1 text-sm text-gray-600">Add the car name, number plate, photos, and main papers.</p>
+          </div>
+
+          <div className="grid gap-4">
+            <label>
+              <FieldLabel>Car Name / Make</FieldLabel>
+              <input className="admin-field h-12" name="make" defaultValue={listing?.make ?? ""} placeholder="Hyundai, BMW, Isuzu..." />
             </label>
             <label>
               <FieldLabel>Model</FieldLabel>
-              <input className="admin-field h-14" name="model" defaultValue={listing?.model ?? ""} placeholder="Swift, Creta, City..." />
-            </label>
-            <label>
-              <FieldLabel>Variant</FieldLabel>
-              <input className="admin-field h-14" name="variant" defaultValue={listing?.variant ?? ""} placeholder="Optional variant" />
-            </label>
-            <label>
-              <FieldLabel>Year</FieldLabel>
-              <input className="admin-field h-14" type="number" name="year" defaultValue={listing?.year ?? ""} placeholder="Year" />
-            </label>
-            <label>
-              <FieldLabel>Fuel</FieldLabel>
-              <input className="admin-field h-14" name="fuel" defaultValue={listing?.fuel ?? ""} placeholder="Petrol, Diesel, CNG..." />
-            </label>
-            <label>
-              <FieldLabel>Transmission</FieldLabel>
-              <input className="admin-field h-14" name="transmission" defaultValue={listing?.transmission ?? ""} placeholder="Manual or Automatic" />
-            </label>
-            <label>
-              <FieldLabel>KM</FieldLabel>
-              <input className="admin-field h-14" type="number" name="kmDriven" defaultValue={listing?.kmDriven ?? ""} placeholder="KM driven" />
-            </label>
-            <label>
-              <FieldLabel>Price</FieldLabel>
-              <input className="admin-field h-14" type="number" name="price" defaultValue={listing?.price ?? ""} placeholder="Price" />
+              <input className="admin-field h-12" name="model" defaultValue={listing?.model ?? ""} placeholder="Creta, X5, D-Max..." />
             </label>
             <label>
               <FieldLabel>Number Plate</FieldLabel>
-              <input className="admin-field h-14" name="numberPlate" defaultValue={listing?.numberPlate ?? ""} placeholder="Number plate" />
+              <input className="admin-field h-12" name="numberPlate" defaultValue={listing?.numberPlate ?? ""} placeholder="PB10AB1234" />
             </label>
             <label>
-              <FieldLabel>Photos</FieldLabel>
-              <input className="admin-field h-14 px-4 py-3" type="file" name="images" multiple accept="image/*" />
+              <FieldLabel>Price</FieldLabel>
+              <input className="admin-field h-12" type="number" name="price" defaultValue={listing?.price ?? ""} placeholder="Price" />
             </label>
-          </div>
 
-          <details className="mt-5 rounded-xl border border-gray-200 bg-white p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-black">More details</summary>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <label>
-                <FieldLabel>File Number</FieldLabel>
-                <input
-                  className="admin-field h-14"
-                  name="stockNumber"
-                  defaultValue={listing?.stockNumber ?? ""}
-                  placeholder="Office file number"
-                />
-              </label>
-              <label>
-                <FieldLabel>Location</FieldLabel>
-                <input className="admin-field h-14" name="location" defaultValue={listing?.location ?? ""} placeholder="Location" />
-              </label>
-              <label>
-                <FieldLabel>Color</FieldLabel>
-                <input className="admin-field h-14" name="color" defaultValue={listing?.color ?? ""} placeholder="Optional color" />
-              </label>
-              <label>
-                <FieldLabel>Owner Number</FieldLabel>
-                <input className="admin-field h-14" type="number" name="ownerCount" defaultValue={listing?.ownerCount ?? ""} placeholder="Owner number" />
-              </label>
-              <label className="md:col-span-2">
-                <FieldLabel>Cover Image Link</FieldLabel>
-                <input
-                  className="admin-field h-14"
-                  name="coverImageUrl"
-                  defaultValue={coverImageUrl}
-                  placeholder="Optional existing image link"
-                />
-              </label>
-              <label className="md:col-span-2">
-                <FieldLabel>Description</FieldLabel>
-                <textarea
-                  className="admin-field min-h-[120px]"
-                  name="description"
-                  defaultValue={listing?.description ?? ""}
-                  placeholder="Extra notes about the car"
-                />
-              </label>
-              {isEditing ? (
+            <details className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-black">Optional details</summary>
+              <div className="mt-4 grid gap-4">
                 <label>
-                  <FieldLabel>Car Status</FieldLabel>
-                  <select className="admin-field h-14" name="status" defaultValue={defaultStatus}>
-                    <option value="available">In Stock</option>
-                    <option value="booked">Booked</option>
-                    <option value="sold">Sold</option>
-                  </select>
-                </label>
-              ) : null}
-              <label className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-4 text-sm font-medium text-gray-800">
-                <input type="checkbox" name="featured" defaultChecked={listing?.featured ?? false} />
-                Show in featured cars
-              </label>
-            </div>
-          </details>
-
-          <div className="mt-6 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setStep("seller")}
-              className="admin-btn"
-            >
-              Back
-            </button>
-            <NextStepButton currentStep="car" setStep={setStep} />
-          </div>
-      </section>
-
-      <section className={step === "save" ? "rounded-xl border border-gray-200 bg-white p-5" : "hidden"}>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500">Save</p>
-          <h2 className="mt-2 text-2xl font-semibold text-black">Save this car file</h2>
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <p className="text-sm font-semibold text-black">Seller</p>
-              <p className="mt-2 text-sm text-gray-600">Name, phone, and seller type are saved in one file.</p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <p className="text-sm font-semibold text-black">Car</p>
-              <p className="mt-2 text-sm text-gray-600">Main car details and photos are ready to save.</p>
-            </div>
-          </div>
-
-          <details className="mt-5 rounded-xl border border-gray-200 bg-white p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-black">Buyer and documents</summary>
-            <div className="mt-4 grid gap-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label>
-                  <FieldLabel>Buyer Name</FieldLabel>
-                  <input className="admin-field h-14" name="buyerName" defaultValue={listing?.buyer?.name ?? ""} placeholder="Optional buyer name" />
+                  <FieldLabel>Model Type</FieldLabel>
+                  <input className="admin-field h-12" name="variant" defaultValue={listing?.variant ?? ""} placeholder="Optional model type" />
                 </label>
                 <label>
-                  <FieldLabel>Buyer Phone</FieldLabel>
-                  <input className="admin-field h-14" name="buyerPhone" defaultValue={listing?.buyer?.phone ?? ""} placeholder="Optional buyer phone" />
+                  <FieldLabel>Year</FieldLabel>
+                  <input className="admin-field h-12" type="number" name="year" defaultValue={listing?.year ?? ""} placeholder="Year" />
                 </label>
                 <label>
-                  <FieldLabel>Sale Date</FieldLabel>
-                  <input className="admin-field h-14" type="date" name="saleDate" defaultValue={listing?.buyer?.saleDate ?? ""} />
+                  <FieldLabel>KM</FieldLabel>
+                  <input className="admin-field h-12" type="number" name="kmDriven" defaultValue={listing?.kmDriven ?? ""} placeholder="KM driven" />
                 </label>
                 <label>
-                  <FieldLabel>Sold Price</FieldLabel>
-                  <input className="admin-field h-14" type="number" name="soldPrice" defaultValue={listing?.buyer?.soldPrice ?? ""} placeholder="Optional sold price" />
+                  <FieldLabel>Fuel</FieldLabel>
+                  <input className="admin-field h-12" name="fuel" defaultValue={listing?.fuel ?? ""} placeholder="Petrol, diesel..." />
                 </label>
-                <label className="md:col-span-2">
-                  <FieldLabel>Buyer Notes</FieldLabel>
-                  <textarea className="admin-field min-h-[110px]" name="buyerNotes" defaultValue={listing?.buyer?.notes ?? ""} placeholder="Optional buyer notes" />
+                <label>
+                  <FieldLabel>Gear</FieldLabel>
+                  <input className="admin-field h-12" name="transmission" defaultValue={listing?.transmission ?? ""} placeholder="Manual or automatic" />
                 </label>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                {documentFields.map((field) => (
-                  <label key={field.name} className="rounded-xl border border-gray-200 bg-white p-4">
-                    <FieldLabel>{field.label}</FieldLabel>
-                    <input className="admin-field h-14 px-4 py-3" type="file" name={field.name} />
-                    <input className="admin-field mt-3 h-14" name={`${field.name}_notes`} placeholder={`${field.label} notes`} />
+                <label>
+                  <FieldLabel>Owner Count</FieldLabel>
+                  <input className="admin-field h-12" type="number" name="ownerCount" defaultValue={listing?.ownerCount ?? ""} placeholder="Owner count" />
+                </label>
+                <label>
+                  <FieldLabel>Color</FieldLabel>
+                  <input className="admin-field h-12" name="color" defaultValue={listing?.color ?? ""} placeholder="Optional color" />
+                </label>
+                <label>
+                  <FieldLabel>Location</FieldLabel>
+                  <input className="admin-field h-12" name="location" defaultValue={listing?.location ?? ""} placeholder="Location" />
+                </label>
+                <label>
+                  <FieldLabel>Notes</FieldLabel>
+                  <textarea className="admin-field min-h-[96px]" name="description" defaultValue={listing?.description ?? ""} placeholder="Optional notes" />
+                </label>
+                {isEditing ? (
+                  <label>
+                    <FieldLabel>Status</FieldLabel>
+                    <select className="admin-field h-12" name="status" defaultValue={defaultStatus}>
+                      <option value="available">Available</option>
+                      <option value="booked">Booked</option>
+                      <option value="sold">Sold</option>
+                    </select>
                   </label>
-                ))}
+                ) : null}
+                <label className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-800">
+                  <input type="checkbox" name="featured" defaultChecked={listing?.featured ?? false} />
+                  Show in featured cars
+                </label>
               </div>
-            </div>
-          </details>
+            </details>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-            {state.message ? (
-              <p className="text-sm text-red-600">{state.message}</p>
-            ) : <span />}
-            <button
-              type="button"
-              onClick={() => setStep("car")}
-              className="admin-btn"
-              disabled={isPending}
-            >
-              Back
-            </button>
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="submit"
-                className="admin-btn"
-                disabled={isPending}
-              >
-                {isPending ? "Saving..." : isEditing ? "Save Changes" : "Save Car"}
-              </button>
+            <UploadCard
+              label="Upload Car Photos"
+              helper="Pick one or more car photos."
+              name="images"
+              accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
+              multiple
+              selectedText={selectedFiles.images}
+              onFilesChange={updateFileLabel}
+            />
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {carDocumentFields.map((field) => (
+                <UploadCard
+                  key={field.name}
+                  label={`Upload ${field.label}`}
+                  helper={`Add ${field.label.toLowerCase()} papers`}
+                  name={field.name}
+                  accept={field.accept}
+                  selectedText={selectedFiles[field.name]}
+                  onFilesChange={updateFileLabel}
+                />
+              ))}
             </div>
           </div>
-      </section>
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button type="button" onClick={() => goToStep("seller")} className="admin-btn h-12 justify-center text-sm">
+              Back
+            </button>
+            <button type="button" onClick={continueFromCar} className="admin-btn h-12 justify-center text-sm">
+              Save Car & Continue
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {step === "buyer" ? (
+        <section className="grid gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">Buyer</p>
+            <h2 className="mt-1 text-2xl font-semibold text-black">Add buyer details</h2>
+            <p className="mt-1 text-sm text-gray-600">Finish the file with buyer details and papers.</p>
+          </div>
+
+          <div className="grid gap-4">
+            <label>
+              <FieldLabel>Buyer Name</FieldLabel>
+              <input className="admin-field h-12" name="buyerName" defaultValue={listing?.buyer?.name ?? ""} placeholder="Buyer name" />
+            </label>
+            <label>
+              <FieldLabel>Phone</FieldLabel>
+              <input className="admin-field h-12" name="buyerPhone" defaultValue={listing?.buyer?.phone ?? ""} placeholder="Phone number" />
+            </label>
+            <label>
+              <FieldLabel>Address</FieldLabel>
+              <input
+                className="admin-field h-12"
+                name="buyerAddress"
+                defaultValue={buyerDraft.address}
+                placeholder="Optional address"
+              />
+            </label>
+            <label>
+              <FieldLabel>Sold Price</FieldLabel>
+              <input className="admin-field h-12" type="number" name="soldPrice" defaultValue={listing?.buyer?.soldPrice ?? ""} placeholder="Optional sold price" />
+            </label>
+            <label>
+              <FieldLabel>Sale Date</FieldLabel>
+              <input className="admin-field h-12" type="date" name="saleDate" defaultValue={listing?.buyer?.saleDate ?? ""} />
+            </label>
+            <label>
+              <FieldLabel>Notes</FieldLabel>
+              <textarea
+                className="admin-field min-h-[96px]"
+                name="buyerNotes"
+                defaultValue={buyerDraft.notes}
+                placeholder="Optional notes"
+              />
+            </label>
+
+            <UploadCard
+              label="Upload Buyer Docs"
+              helper="Pick buyer papers now. They upload when you save the file."
+              name="document_buyer_id"
+              accept={documentAccept}
+              selectedText={selectedFiles.document_buyer_id}
+              onFilesChange={updateFileLabel}
+            />
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button type="button" onClick={() => goToStep("car")} className="admin-btn h-12 justify-center text-sm" disabled={isPending}>
+              Back
+            </button>
+            <button type="submit" className="admin-btn h-12 justify-center text-sm" disabled={isPending}>
+              {isPending ? "Saving File..." : isEditing ? "Save File" : "Create File"}
+            </button>
+          </div>
+        </section>
+      ) : null}
     </form>
   );
 }

@@ -526,12 +526,15 @@ export async function saveListingAction(
 
   const buyerName = String(formData.get("buyerName") || "");
   const buyerPhone = String(formData.get("buyerPhone") || "");
+  const buyerAddress = String(formData.get("buyerAddress") || "");
   const buyerNotes = String(formData.get("buyerNotes") || "");
+  const combinedBuyerNotes = buildBuyerNotes(buyerAddress, buyerNotes);
   const soldPrice = Number(formData.get("soldPrice") || 0) || null;
   const saleDate = String(formData.get("saleDate") || "") || null;
   const hasBuyerData = Boolean(
     buyerName.trim() ||
       buyerPhone.trim() ||
+      buyerAddress.trim() ||
       buyerNotes.trim() ||
       soldPrice ||
       saleDate,
@@ -542,7 +545,7 @@ export async function saveListingAction(
       listing_id: listingId,
       name: buyerName || null,
       phone: buyerPhone || null,
-      notes: buyerNotes || null,
+      notes: combinedBuyerNotes,
       sold_price: soldPrice,
       sale_date: saleDate,
     });

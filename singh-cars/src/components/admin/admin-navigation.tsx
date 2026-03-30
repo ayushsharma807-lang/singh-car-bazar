@@ -80,7 +80,7 @@ export function MobileBottomNav({ items }: { items: NavItem[] }) {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-4 gap-2">
+      <div className="mx-auto grid max-w-md grid-cols-5 gap-1.5">
         {items.map((item) => {
           const Icon = iconMap[item.icon];
           const isActive = isActivePath(pathname, item.href);
@@ -91,18 +91,18 @@ export function MobileBottomNav({ items }: { items: NavItem[] }) {
               href={item.href}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 rounded-xl border px-3 py-2.5 text-[11px] font-semibold transition",
+                "flex flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2 text-[10px] font-semibold transition",
                 isActive
                   ? "border-gray-200 bg-gray-100 text-gray-900 shadow-sm"
                   : "border-transparent bg-transparent text-gray-500 hover:border-gray-200 hover:bg-gray-50 hover:text-gray-900",
               )}
             >
               <div className="relative">
-                <Icon className="h-5 w-5" />
+                <Icon className="h-[18px] w-[18px]" />
                 {typeof item.count === "number" && item.count > 0 ? (
                   <span
                     className={cn(
-                      "absolute -right-3 -top-2 rounded-full border px-1.5 py-0.5 text-[10px] leading-none",
+                      "absolute -right-2.5 -top-2 rounded-full border px-1.5 py-0.5 text-[9px] leading-none",
                       isActive
                         ? "border-gray-300 bg-white text-gray-900"
                         : "border-gray-200 bg-white text-gray-700",
