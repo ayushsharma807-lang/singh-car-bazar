@@ -2,7 +2,7 @@
 
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronRight, FileImage, FileText, UserRound } from "lucide-react";
+import { Check, ChevronRight, FileImage, FileText, UserRound, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { UploadSourceButton } from "@/components/admin/upload-source-button";
 import type { Listing } from "@/types";
@@ -125,6 +125,7 @@ function UploadCard({
   multiple = false,
   files,
   onFilesChange,
+  onRemoveFile,
 }: {
   label: string;
   helper: string;
@@ -133,12 +134,13 @@ function UploadCard({
   multiple?: boolean;
   files?: File[];
   onFilesChange: (name: string, sourceKey: string, files: FileList | null) => void;
+  onRemoveFile: (name: string, index: number) => void;
 }) {
   const fileCount = files?.length || 0;
   const selectedText = fileCount
     ? fileCount === 1
       ? files?.[0]?.name || helper
-      : `${fileCount} files ready to upload`
+      : `${fileCount} files selected`
     : helper;
   const isPhotoField = name === "images";
   const sheetTitle = isPhotoField ? "Add car photos" : label;
@@ -150,7 +152,7 @@ function UploadCard({
         <p className="mt-1 text-sm text-gray-600">{selectedText}</p>
       </div>
       <UploadSourceButton
-        buttonLabel={fileCount ? "Add More" : "Choose Source"}
+        buttonLabel={fileCount ? "Add More Files" : "Choose Source"}
         sheetTitle={sheetTitle}
         desktopSourceKey="files"
         className="inline-flex min-h-12 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-black"
@@ -207,6 +209,36 @@ function UploadCard({
         }
         onFilesSelected={(sourceKey, fileList) => onFilesChange(name, sourceKey, fileList)}
       />
+      {fileCount ? (
+        <div className="grid gap-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {fileCount} file{fileCount > 1 ? "s" : ""} selected
+          </p>
+          <div className="grid gap-2">
+            {files?.map((file, index) => (
+              <div
+                key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-black">{file.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {Math.max(1, Math.round(file.size / 1024))} KB
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 text-gray-500"
+                  onClick={() => onRemoveFile(name, index)}
+                  aria-label={`Remove ${file.name}`}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -267,6 +299,24 @@ export function ListingForm({ listing }: ListingFormProps) {
       return {
         ...current,
         [name]: deduped,
+      };
+    });
+  }
+
+  function removeSelectedFile(name: string, indexToRemove: number) {
+    setSelectedFiles((current) => {
+      const existingFiles = current[name] ?? [];
+      const nextFiles = existingFiles.filter((_, index) => index !== indexToRemove);
+
+      if (!nextFiles.length) {
+        const next = { ...current };
+        delete next[name];
+        return next;
+      }
+
+      return {
+        ...current,
+        [name]: nextFiles,
       };
     });
   }
@@ -459,6 +509,7 @@ export function ListingForm({ listing }: ListingFormProps) {
               multiple
               files={selectedFiles.document_seller_id}
               onFilesChange={updateSelectedFiles}
+              onRemoveFile={removeSelectedFile}
             />
           </div>
 
@@ -557,6 +608,7 @@ export function ListingForm({ listing }: ListingFormProps) {
               multiple
               files={selectedFiles.images}
               onFilesChange={updateSelectedFiles}
+              onRemoveFile={removeSelectedFile}
             />
 
             <div className="grid gap-3 sm:grid-cols-3">
@@ -570,6 +622,7 @@ export function ListingForm({ listing }: ListingFormProps) {
                   multiple
                   files={selectedFiles[field.name]}
                   onFilesChange={updateSelectedFiles}
+                  onRemoveFile={removeSelectedFile}
                 />
               ))}
             </div>
@@ -640,6 +693,7 @@ export function ListingForm({ listing }: ListingFormProps) {
               multiple
               files={selectedFiles.document_buyer_id}
               onFilesChange={updateSelectedFiles}
+              onRemoveFile={removeSelectedFile}
             />
           </div>
 
