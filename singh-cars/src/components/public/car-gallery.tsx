@@ -50,15 +50,17 @@ export function CarGallery({
 
   return (
     <div className="grid gap-4">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={activeImage.imageUrl}
-        alt={title}
-        className="h-[380px] w-full rounded-[32px] object-cover shadow-sm sm:h-[440px]"
-      />
+      <div className="flex h-[420px] w-full items-center justify-center overflow-hidden rounded-[32px] border border-slate-200 bg-gradient-to-b from-slate-100 to-white p-3 shadow-sm sm:h-[520px] sm:p-5 lg:h-[620px]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={activeImage.imageUrl}
+          alt={title}
+          className="h-full w-full object-contain object-center"
+        />
+      </div>
 
       {validImages.length > 1 ? (
-        <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
           {validImages.map((image, index) => {
             const isActive = image.id === activeImage.id;
 
@@ -67,19 +69,21 @@ export function CarGallery({
                 key={image.id}
                 type="button"
                 onClick={() => setActiveImageId(image.id)}
-                className={`overflow-hidden rounded-[18px] border transition ${
+                className={`overflow-hidden rounded-[18px] border bg-white p-1.5 transition ${
                   isActive
-                    ? "border-[#2252e8] shadow-sm"
+                    ? "border-[#2252e8] shadow-sm ring-2 ring-[#2252e8]/15"
                     : "border-slate-200 hover:border-slate-300"
                 }`}
                 aria-label={`Show photo ${index + 1}`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={image.imageUrl}
-                  alt={`${title} ${index + 1}`}
-                  className="h-20 w-full object-cover"
-                />
+                <div className="flex h-24 items-center justify-center overflow-hidden rounded-[14px] bg-gradient-to-b from-slate-100 to-white sm:h-28">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={image.imageUrl}
+                    alt={`${title} ${index + 1}`}
+                    className="h-full w-full object-contain object-center"
+                  />
+                </div>
               </button>
             );
           })}
