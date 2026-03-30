@@ -238,8 +238,7 @@ export function ListingForm({ listing }: ListingFormProps) {
         </div>
       ) : null}
 
-      {step === "seller" ? (
-        <section className="grid gap-4">
+      <section className={step === "seller" ? "grid gap-4" : "hidden"} aria-hidden={step !== "seller"}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">Seller</p>
             <h2 className="mt-1 text-2xl font-semibold text-black">Add seller details</h2>
@@ -298,14 +297,12 @@ export function ListingForm({ listing }: ListingFormProps) {
             <ChevronRight className="h-4 w-4" />
           </button>
         </section>
-      ) : null}
 
-      {step === "car" ? (
-        <section className="grid gap-4">
+      <section className={step === "car" ? "grid gap-4" : "hidden"} aria-hidden={step !== "car"}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">Car</p>
             <h2 className="mt-1 text-2xl font-semibold text-black">Add car details</h2>
-            <p className="mt-1 text-sm text-gray-600">Add the car name, number plate, photos, and main papers.</p>
+            <p className="mt-1 text-sm text-gray-600">Add the car name, number plate, photos, and main papers. Buyer details can be added later when the car is sold.</p>
           </div>
 
           <div className="grid gap-4">
@@ -411,20 +408,21 @@ export function ListingForm({ listing }: ListingFormProps) {
             <button type="button" onClick={() => goToStep("seller")} className="admin-btn h-12 justify-center text-sm">
               Back
             </button>
-            <button type="button" onClick={continueFromCar} className="admin-btn h-12 justify-center text-sm">
-              Save Car & Continue
+            <button type="submit" className="admin-btn h-12 justify-center text-sm" disabled={isPending}>
+              {isPending ? "Saving File..." : isEditing ? "Save File" : "Create File"}
+            </button>
+            <button type="button" onClick={continueFromCar} className="admin-btn h-12 justify-center text-sm" disabled={isPending}>
+              Add Buyer Details
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </section>
-      ) : null}
 
-      {step === "buyer" ? (
-        <section className="grid gap-4">
+      <section className={step === "buyer" ? "grid gap-4" : "hidden"} aria-hidden={step !== "buyer"}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">Buyer</p>
             <h2 className="mt-1 text-2xl font-semibold text-black">Add buyer details</h2>
-            <p className="mt-1 text-sm text-gray-600">Finish the file with buyer details and papers.</p>
+            <p className="mt-1 text-sm text-gray-600">Add buyer details only when the car is sold.</p>
           </div>
 
           <div className="grid gap-4">
@@ -478,11 +476,10 @@ export function ListingForm({ listing }: ListingFormProps) {
               Back
             </button>
             <button type="submit" className="admin-btn h-12 justify-center text-sm" disabled={isPending}>
-              {isPending ? "Saving File..." : isEditing ? "Save File" : "Create File"}
+              {isPending ? "Saving File..." : isEditing ? "Save Buyer & File" : "Create File With Buyer"}
             </button>
           </div>
         </section>
-      ) : null}
     </form>
   );
 }
