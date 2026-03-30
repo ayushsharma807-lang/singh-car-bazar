@@ -17,6 +17,7 @@ type FormSubmitState = {
   status: "idle" | "success" | "error";
   message?: string;
   redirectTo?: string;
+  listingId?: string;
 };
 
 const stepOrder: Step[] = ["seller", "car", "buyer"];
@@ -356,6 +357,93 @@ export function ListingForm({ listing }: ListingFormProps) {
     goToStep("buyer");
   }
 
+  async function uploadFilesForListing(listingId: string) {
+    const uploadPlans = [
+      {
+        field: "images",
+        label: "Car photos",
+        endpoint: "/api/admin/upload-listing-images",
+        filesField: "images",
+        extraFields: {} as Record<string, string>,
+      },
+      {
+        field: "document_seller_id",
+        label: "Seller documents",
+        endpoint: "/api/admin/upload-documents",
+        filesField: "files",
+        extraFields: { docType: "seller_id" },
+      },
+      {
+        field: "document_rc",
+        label: "RC documents",
+        endpoint: "/api/admin/upload-documents",
+        filesField: "files",
+        extraFields: { docType: "rc" },
+      },
+      {
+        field: "document_insurance",
+        label: "Insurance documents",
+        endpoint: "/api/admin/upload-documents",
+        filesField: "files",
+        extraFields: { docType: "insurance" },
+      },
+      {
+        field: "document_other",
+        label: "Other papers",
+        endpoint: "/api/admin/upload-documents",
+        filesField: "files",
+        extraFields: { docType: "other" },
+      },
+      {
+        field: "document_buyer_id",
+        label: "Buyer documents",
+        endpoint: "/api/admin/upload-documents",
+        filesField: "files",
+        extraFields: { docType: "buyer_id" },
+      },
+    ] as const;
+
+    for (const plan of uploadPlans) {
+      const files = selectedFiles[plan.field] ?? [];
+
+      if (!files.length) {
+        continue;
+      }
+
+      const uploadPayload = new FormData();
+      uploadPayload.append("listingId", listingId);
+
+      Object.entries(plan.extraFields).forEach(([key, value]) => {
+        uploadPayload.append(key, value);
+      });
+
+      files.forEach((file) => {
+        uploadPayload.append(plan.filesField, file);
+      });
+
+      const response = await fetch(plan.endpoint, {
+        method: "POST",
+        body: uploadPayload,
+      });
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!contentType.includes("application/json")) {
+        throw new Error(
+          `${plan.label} upload failed. The file was created, but the server returned an unexpected response.`,
+        );
+      }
+
+      const result = (await response.json()) as {
+        success?: boolean;
+        message?: string;
+      };
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || `${plan.label} upload failed.`);
+      }
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -366,18 +454,13 @@ export function ListingForm({ listing }: ListingFormProps) {
     setLocalMessage("");
     setState({ status: "idle" });
     setIsPending(true);
+    let createdListingId = "";
 
     try {
       const payload = new FormData(formRef.current);
       for (const fieldName of uploadFieldNames) {
         payload.delete(fieldName);
       }
-
-      Object.entries(selectedFiles).forEach(([fieldName, files]) => {
-        files.forEach((file) => {
-          payload.append(fieldName, file);
-        });
-      });
 
       const response = await fetch("/api/admin/create-file", {
         method: "POST",
@@ -394,6 +477,7 @@ export function ListingForm({ listing }: ListingFormProps) {
         success?: boolean;
         message?: string;
         redirectTo?: string;
+        listingId?: string;
       };
 
       if (!response.ok || !result.success) {
@@ -404,18 +488,34 @@ export function ListingForm({ listing }: ListingFormProps) {
         return;
       }
 
+      const listingId = typeof result.listingId === "string" ? result.listingId : "";
+      createdListingId = listingId;
+
+      if (!listingId) {
+        throw new Error("File was created, but the saved file id is missing.");
+      }
+
+      await uploadFilesForListing(listingId);
+
       setState({
         status: "success",
         message: result.message || "Car saved successfully.",
         redirectTo: result.redirectTo || "/admin",
+        listingId,
       });
     } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not create file. Please try again.";
+
       setState({
         status: "error",
         message:
-          error instanceof Error
-            ? error.message
-            : "Could not create file. Please try again.",
+          createdListingId && error instanceof Error
+            ? `${message} The file was created. Open it to finish the remaining uploads.`
+            : message,
+        listingId: createdListingId || undefined,
       });
     } finally {
       setIsPending(false);
@@ -454,6 +554,15 @@ export function ListingForm({ listing }: ListingFormProps) {
           }`}
         >
           {state.message}
+          {state.status === "error" && state.listingId ? (
+            <button
+              type="button"
+              className="mt-3 inline-flex rounded-xl border border-current px-3 py-2 text-sm font-semibold"
+              onClick={() => router.push(`/admin/files/${state.listingId}`)}
+            >
+              Open saved file
+            </button>
+          ) : null}
         </div>
       ) : null}
 
