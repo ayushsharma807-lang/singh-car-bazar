@@ -12,8 +12,10 @@ export type InquiryActionState = {
 };
 
 export type SaveListingActionState = {
-  status: "idle" | "error";
+  status: "idle" | "success" | "error";
   message?: string;
+  redirectTo?: string;
+  listingId?: string;
 };
 
 async function requireAdminSession() {
@@ -295,9 +297,9 @@ async function redirectToAdminFile(listingId: string, saved?: "seller" | "car" |
   redirect(saved ? `/admin/files/${listingId}?saved=${saved}` : `/admin/files/${listingId}`);
 }
 
-async function redirectToAdminHome(listingId: string, saved: "car") {
+async function buildAdminHomeRedirect(listingId: string, saved: "car") {
   await revalidateAdminFilePaths(listingId);
-  redirect(`/admin?saved=${saved}&file=${listingId}`);
+  return `/admin?saved=${saved}&file=${listingId}`;
 }
 
 export async function submitInquiryAction(
@@ -615,8 +617,14 @@ export async function saveListingAction(
     }
   }
 
-  await redirectToAdminHome(listingId, "car");
-  return { status: "idle" };
+  const redirectTo = await buildAdminHomeRedirect(listingId, "car");
+
+  return {
+    status: "success",
+    message: "Car saved successfully.",
+    redirectTo,
+    listingId,
+  };
 }
 
 export async function updateSellerInfoAction(formData: FormData) {

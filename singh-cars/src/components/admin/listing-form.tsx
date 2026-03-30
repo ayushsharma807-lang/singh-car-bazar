@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Check, ChevronRight, FileImage, FileText, UserRound } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { saveListingAction, type SaveListingActionState } from "@/app/admin/actions";
 import type { Listing } from "@/types";
 
@@ -139,6 +140,7 @@ function UploadCard({
 }
 
 export function ListingForm({ listing }: ListingFormProps) {
+  const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
   const isEditing = Boolean(listing);
   const defaultStatus = listing?.status ?? "available";
@@ -149,10 +151,21 @@ export function ListingForm({ listing }: ListingFormProps) {
   const [localMessage, setLocalMessage] = useState<string>("");
   const [selectedFiles, setSelectedFiles] = useState<Record<string, string>>({});
 
+  useEffect(() => {
+    if (state.status !== "success" || !state.redirectTo) {
+      return;
+    }
+
+    router.push(state.redirectTo);
+    router.refresh();
+  }, [router, state.redirectTo, state.status]);
+
   function goToStep(nextStep: Step) {
     setLocalMessage("");
     setStep(nextStep);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }
 
   function updateFileLabel(name: string, files: FileList | null) {
@@ -233,7 +246,13 @@ export function ListingForm({ listing }: ListingFormProps) {
       ) : null}
 
       {state.message ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+        <div
+          className={`rounded-xl px-4 py-3 text-sm font-semibold ${
+            state.status === "success"
+              ? "border border-green-200 bg-green-50 text-green-700"
+              : "border border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
           {state.message}
         </div>
       ) : null}
