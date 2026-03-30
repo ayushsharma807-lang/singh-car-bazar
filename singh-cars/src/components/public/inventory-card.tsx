@@ -30,18 +30,20 @@ export function InventoryCard({ listing }: { listing: Listing }) {
     <Link href={`/inventory/${listing.id}`} className="block">
       <div className="group cursor-pointer overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:shadow-lg">
         {featuredImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={featuredImage}
-            alt={title}
-            className="h-56 w-full object-cover lg:h-64"
-            onError={() => setImageFailed(true)}
-          />
+          <div className="flex h-56 w-full items-center justify-center overflow-hidden rounded-t-2xl bg-gray-100 p-3 sm:h-60 lg:h-72">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={featuredImage}
+              alt={title}
+              className="h-full w-full object-contain object-center"
+              onError={() => setImageFailed(true)}
+            />
+          </div>
         ) : (
           <PlaceholderMedia
             label={[listing.make, listing.model].filter(Boolean).join(" ") || "Car"}
             subtitle={listing.variant ?? listing.location}
-            className="h-56 rounded-none border-0 bg-gray-50 lg:h-64"
+            className="h-56 rounded-none border-0 bg-gray-100 sm:h-60 lg:h-72"
           />
         )}
         <div className="space-y-2 p-4">
