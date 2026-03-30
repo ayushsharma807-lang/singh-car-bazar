@@ -86,6 +86,8 @@ type BuyerDraft = {
   saleDate: string;
 };
 
+type DocumentFilter = "all" | "seller" | "car" | "buyer";
+
 const carDocumentGroups = [
   { label: "RC", docType: "rc", emptyText: "No RC uploaded yet" },
   { label: "Insurance", docType: "insurance", emptyText: "No insurance uploaded yet" },
@@ -212,6 +214,73 @@ function formatFileSize(bytes: number) {
   }
 
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function toAbsoluteUrl(url: string) {
+  if (typeof window === "undefined") {
+    return url;
+  }
+
+  try {
+    return new URL(url, window.location.origin).toString();
+  } catch {
+    return url;
+  }
+}
+
+function buildWhatsappHref(message: string) {
+  return `https://wa.me/?text=${encodeURIComponent(message)}`;
+}
+
+async function copyText(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
+
+function buildItemShareMessage({
+  sectionLabel,
+  itemLabel,
+  fileNumber,
+  numberPlate,
+  carName,
+  sellerName,
+  buyerName,
+  url,
+}: {
+  sectionLabel: string;
+  itemLabel: string;
+  fileNumber: string;
+  numberPlate: string;
+  carName: string;
+  sellerName?: string | null;
+  buyerName?: string | null;
+  url: string;
+}) {
+  return [
+    "Singh Car Bazar",
+    `File No: ${fileNumber}`,
+    `Car: ${carName}`,
+    numberPlate ? `Number Plate: ${numberPlate}` : "",
+    sellerName ? `Seller: ${sellerName}` : "",
+    buyerName ? `Buyer: ${buyerName}` : "",
+    `Section: ${sectionLabel}`,
+    `File: ${itemLabel}`,
+    url,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function getFriendlyUploadError(error: unknown) {
@@ -957,15 +1026,55 @@ function FileCard({
   url,
   isImage,
   onRemove,
+  sectionLabel,
+  fileNumber,
+  numberPlate,
+  carName,
+  sellerName,
+  buyerName,
 }: {
   title: string;
   url: string;
   isImage: boolean;
   onRemove: () => Promise<void> | void;
+  sectionLabel: string;
+  fileNumber: string;
+  numberPlate: string;
+  carName: string;
+  sellerName?: string | null;
+  buyerName?: string | null;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "done" | "error">("idle");
+
+  const absoluteUrl = toAbsoluteUrl(url);
+  const shareMessage = buildItemShareMessage({
+    sectionLabel,
+    itemLabel: title,
+    fileNumber,
+    numberPlate,
+    carName,
+    sellerName,
+    buyerName,
+    url: absoluteUrl,
+  });
+
+  async function handleCopy() {
+    try {
+      await copyText(absoluteUrl);
+      setCopyState("done");
+      window.setTimeout(() => setCopyState("idle"), 1800);
+    } catch {
+      setCopyState("error");
+      window.setTimeout(() => setCopyState("idle"), 1800);
+    }
+  }
+
+  function handleWhatsappShare() {
+    window.open(buildWhatsappHref(shareMessage), "_blank", "noopener,noreferrer");
+  }
 
   return (
     <>
@@ -991,8 +1100,14 @@ function FileCard({
           </div>
           <div className="flex flex-wrap gap-2">
             <a href={url} target="_blank" rel="noreferrer" className="admin-btn admin-btn-sm">
-              Open
+              View
             </a>
+            <button type="button" className="admin-btn admin-btn-sm" onClick={handleWhatsappShare}>
+              Share
+            </button>
+            <button type="button" className="admin-btn admin-btn-sm" onClick={handleCopy}>
+              {copyState === "done" ? "Copied" : copyState === "error" ? "Retry Copy" : "Copy Link"}
+            </button>
             <button
               type="button"
               className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1002,6 +1117,9 @@ function FileCard({
               {isRemoving ? "Removing..." : "Remove"}
             </button>
           </div>
+          {copyState === "error" ? (
+            <p className="text-xs font-medium text-red-600">Copy failed. Please try again.</p>
+          ) : null}
         </div>
       </div>
 
@@ -1073,10 +1191,14 @@ function SellerDocCard({
   document,
   listingId,
   onRemove,
+  file,
+  sectionLabel,
 }: {
   document: ListingDocument;
   listingId: string;
   onRemove: (documentId: string) => void;
+  file: AdminFileRecord;
+  sectionLabel: string;
 }) {
   const [, startTransition] = useTransition();
   const meta = getDocumentMeta(document);
@@ -1087,6 +1209,12 @@ function SellerDocCard({
       title={meta.fileName}
       url={document.fileUrl}
       isImage={image}
+      sectionLabel={sectionLabel}
+      fileNumber={file.fileNumber}
+      numberPlate={file.numberPlate}
+      carName={file.carName}
+      sellerName={file.sellerName}
+      buyerName={file.buyerName}
       onRemove={() =>
         startTransition(async () => {
           const formData = new FormData();
@@ -1109,17 +1237,46 @@ function PhotoCard({
   isCover,
   onSetCover,
   onRemove,
+  file,
 }: {
   image: ListingImage;
   listingId: string;
   isCover: boolean;
   onSetCover: (imageId: string, imageUrl: string) => void;
   onRemove: (imageId: string) => void;
+  file: AdminFileRecord;
 }) {
   const [isPending, startTransition] = useTransition();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "done" | "error">("idle");
   const displayLabel = isCover ? "Cover photo" : "Photo";
+  const absoluteUrl = toAbsoluteUrl(image.imageUrl);
+  const shareMessage = buildItemShareMessage({
+    sectionLabel: "Car Photos",
+    itemLabel: displayLabel,
+    fileNumber: file.fileNumber,
+    numberPlate: file.numberPlate,
+    carName: file.carName,
+    sellerName: file.sellerName,
+    buyerName: file.buyerName,
+    url: absoluteUrl,
+  });
+
+  async function handleCopy() {
+    try {
+      await copyText(absoluteUrl);
+      setCopyState("done");
+      window.setTimeout(() => setCopyState("idle"), 1800);
+    } catch {
+      setCopyState("error");
+      window.setTimeout(() => setCopyState("idle"), 1800);
+    }
+  }
+
+  function handleWhatsappShare() {
+    window.open(buildWhatsappHref(shareMessage), "_blank", "noopener,noreferrer");
+  }
 
   return (
     <>
@@ -1150,6 +1307,20 @@ function PhotoCard({
             <span className="text-xs font-medium text-gray-500">Tap to preview</span>
           )}
         </div>
+        <div className="flex flex-wrap gap-2 px-3 pb-3">
+          <button type="button" className="admin-btn admin-btn-sm" onClick={() => setPreviewOpen(true)}>
+            View
+          </button>
+          <button type="button" className="admin-btn admin-btn-sm" onClick={handleWhatsappShare}>
+            Share
+          </button>
+          <button type="button" className="admin-btn admin-btn-sm" onClick={handleCopy}>
+            {copyState === "done" ? "Copied" : copyState === "error" ? "Retry Copy" : "Copy Link"}
+          </button>
+        </div>
+        {copyState === "error" ? (
+          <p className="px-3 pb-3 text-xs font-medium text-red-600">Copy failed. Please try again.</p>
+        ) : null}
       </div>
       {previewOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4">
@@ -1292,6 +1463,7 @@ export function FileWorkspace({
   const [coverImageUrl, setCoverImageUrl] = useState(
     file.listing.coverImageUrl ?? file.listing.images[0]?.imageUrl ?? "",
   );
+  const [documentFilter, setDocumentFilter] = useState<DocumentFilter>("all");
 
   const sellerDone = Boolean(sellerDraft.name.trim() && sellerDraft.phone.trim());
   const carDone = Boolean(
@@ -1348,6 +1520,24 @@ export function FileWorkspace({
     }
 
     openStep(step, editWhenOpening);
+  }
+
+  function openDocumentFilter(filter: DocumentFilter) {
+    setDocumentFilter(filter);
+
+    if (filter === "seller") {
+      openStep("seller");
+      return;
+    }
+
+    if (filter === "car") {
+      openStep("car");
+      return;
+    }
+
+    if (filter === "buyer" && showBuyerStep) {
+      openStep("buyer");
+    }
   }
 
   useEffect(() => {
@@ -1407,6 +1597,27 @@ export function FileWorkspace({
               }
             }}
           />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            { key: "all", label: "All" },
+            { key: "seller", label: "Seller Docs" },
+            { key: "car", label: "Car Docs" },
+            ...(showBuyerStep ? [{ key: "buyer", label: "Buyer Docs" }] : []),
+          ].map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => openDocumentFilter(item.key as DocumentFilter)}
+              className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                documentFilter === item.key
+                  ? "border-black bg-black text-white"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
       </section>
 
@@ -1511,6 +1722,8 @@ export function FileWorkspace({
                       key={document.id}
                       document={document}
                       listingId={file.id}
+                      file={file}
+                      sectionLabel="Seller Docs"
                       onRemove={(documentId) =>
                         setSellerDocs((current) => current.filter((entry) => entry.id !== documentId))
                       }
@@ -1608,6 +1821,8 @@ export function FileWorkspace({
                       key={document.id}
                       document={document}
                       listingId={file.id}
+                      file={file}
+                      sectionLabel="Seller Docs"
                       onRemove={(documentId) =>
                         setSellerDocs((current) => current.filter((entry) => entry.id !== documentId))
                       }
@@ -1879,6 +2094,8 @@ export function FileWorkspace({
                                 key={document.id}
                                 document={document}
                                 listingId={file.id}
+                                file={file}
+                                sectionLabel="Car Docs"
                                 onRemove={(documentId) =>
                                   setCarDocs((current) => ({
                                     ...current,
@@ -1934,6 +2151,7 @@ export function FileWorkspace({
                         key={image.id}
                         image={image}
                         listingId={file.id}
+                        file={file}
                         isCover={coverImageUrl === image.imageUrl}
                         onSetCover={(_, imageUrl) => setCoverImageUrl(imageUrl)}
                         onRemove={(imageId) =>
@@ -2094,6 +2312,8 @@ export function FileWorkspace({
                                 key={document.id}
                                 document={document}
                                 listingId={file.id}
+                                file={file}
+                                sectionLabel="Car Docs"
                                 onRemove={(documentId) =>
                                   setCarDocs((current) => ({
                                     ...current,
@@ -2147,6 +2367,7 @@ export function FileWorkspace({
                         key={image.id}
                         image={image}
                         listingId={file.id}
+                        file={file}
                         isCover={coverImageUrl === image.imageUrl}
                         onSetCover={(_, imageUrl) => setCoverImageUrl(imageUrl)}
                         onRemove={(imageId) =>
@@ -2300,6 +2521,8 @@ export function FileWorkspace({
                         key={document.id}
                         document={document}
                         listingId={file.id}
+                        file={file}
+                        sectionLabel="Buyer Docs"
                         onRemove={(documentId) =>
                           setBuyerDocs((current) => current.filter((entry) => entry.id !== documentId))
                         }
@@ -2401,6 +2624,8 @@ export function FileWorkspace({
                         key={document.id}
                         document={document}
                         listingId={file.id}
+                        file={file}
+                        sectionLabel="Buyer Docs"
                         onRemove={(documentId) =>
                           setBuyerDocs((current) => current.filter((entry) => entry.id !== documentId))
                         }

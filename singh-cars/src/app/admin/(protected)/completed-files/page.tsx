@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { MessageCircleMore, Pencil, Search, SquareArrowOutUpRight } from "lucide-react";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { buildAdminCarName, getAdminFiles, getAdminSetupErrorMessage } from "@/lib/data";
@@ -6,6 +7,10 @@ import { buildAdminCarName, getAdminFiles, getAdminSetupErrorMessage } from "@/l
 type CompletedFilesPageProps = {
   searchParams: Promise<Record<string, string | undefined>>;
 };
+
+function normalizeQuery(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
 
 function buildWhatsappShareLink(file: Awaited<ReturnType<typeof getAdminFiles>>[number]) {
   const summary = [
@@ -52,6 +57,20 @@ export default async function CompletedFilesPage({
         </section>
       </AdminShell>
     );
+  }
+
+  const exactMatch = params.query?.trim()
+    ? files.find((file) => {
+        const normalizedQuery = normalizeQuery(params.query ?? "");
+        return (
+          normalizeQuery(file.fileNumber) === normalizedQuery ||
+          normalizeQuery(file.numberPlate) === normalizedQuery
+        );
+      }) ?? null
+    : null;
+
+  if (exactMatch) {
+    redirect(`/admin/files/${exactMatch.id}`);
   }
 
   return (

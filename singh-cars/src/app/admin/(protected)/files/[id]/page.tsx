@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { markListingSoldAction } from "@/app/admin/actions";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { FileWorkspace } from "@/components/admin/file-workspace";
-import { getAdminFileById } from "@/lib/data";
+import { buildAdminCarName, getAdminFileById } from "@/lib/data";
 
 type AdminFileDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -53,6 +53,17 @@ export default async function AdminFileDetailPage({
           : file.isCompletedFile
             ? "This file is ready to move to Completed Files."
             : "Keep adding papers and photos to finish this file.";
+  const whatsappSummary = [
+    "Singh Car Bazar",
+    `File No: ${file.fileNumber}`,
+    `Car: ${buildAdminCarName(file.listing)}`,
+    file.numberPlate ? `Number Plate: ${file.numberPlate}` : "",
+    file.sellerName ? `Seller: ${file.sellerName}` : "",
+    file.buyerName ? `Buyer: ${file.buyerName}` : "",
+    `Status: ${topStatus}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   return (
     <AdminShell>
@@ -85,30 +96,60 @@ export default async function AdminFileDetailPage({
               <p className="mt-3 text-sm text-gray-600">{nextStepText}</p>
             </div>
             {file.isCompletedFile ? (
-              <Link
-                href={`/admin/completed-files?completed=1&file=${file.id}`}
-                className="admin-btn h-12 px-5 text-base"
-              >
-                Mark as Complete
-              </Link>
-            ) : file.status === "sold" && nextStep ? (
-              <Link
-                href={`/admin/files/${file.id}#${nextStep}-step`}
-                className="admin-btn h-12 px-5 text-base"
-              >
-                Add Missing Info
-              </Link>
-            ) : (
-              <form action={markListingSoldAction}>
-                <input type="hidden" name="listingId" value={file.id} />
-                <button
-                  type="submit"
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href={`https://wa.me/?text=${encodeURIComponent(whatsappSummary)}`}
+                  target="_blank"
+                  rel="noreferrer"
                   className="admin-btn h-12 px-5 text-base"
-                  disabled={file.status === "sold"}
                 >
-                  {file.status === "sold" ? "Sold" : "Mark as Sold"}
-                </button>
-              </form>
+                  Share Car Info
+                </Link>
+                <Link
+                  href={`/admin/completed-files?completed=1&file=${file.id}`}
+                  className="admin-btn h-12 px-5 text-base"
+                >
+                  Mark as Complete
+                </Link>
+              </div>
+            ) : file.status === "sold" && nextStep ? (
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href={`https://wa.me/?text=${encodeURIComponent(whatsappSummary)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="admin-btn h-12 px-5 text-base"
+                >
+                  Share Car Info
+                </Link>
+                <Link
+                  href={`/admin/files/${file.id}#${nextStep}-step`}
+                  className="admin-btn h-12 px-5 text-base"
+                >
+                  Add Missing Info
+                </Link>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href={`https://wa.me/?text=${encodeURIComponent(whatsappSummary)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="admin-btn h-12 px-5 text-base"
+                >
+                  Share Car Info
+                </Link>
+                <form action={markListingSoldAction}>
+                  <input type="hidden" name="listingId" value={file.id} />
+                  <button
+                    type="submit"
+                    className="admin-btn h-12 px-5 text-base"
+                    disabled={file.status === "sold"}
+                  >
+                    {file.status === "sold" ? "Sold" : "Mark as Sold"}
+                  </button>
+                </form>
+              </div>
             )}
           </div>
         </section>

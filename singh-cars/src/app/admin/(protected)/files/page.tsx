@@ -1,6 +1,8 @@
+import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { FileFilters } from "@/components/admin/file-filters";
 import { FilesTable } from "@/components/admin/files-table";
+import type { AdminFileRecord } from "@/types";
 import { getAdminFiles, getAdminSetupErrorMessage } from "@/lib/data";
 
 type AdminFilesPageProps = {
@@ -39,6 +41,11 @@ export default async function AdminFilesPage({
     );
   }
 
+  const exactMatch = findExactFileMatch(files, params.query);
+  if (exactMatch) {
+    redirect(`/admin/files/${exactMatch.id}`);
+  }
+
   return (
     <AdminShell>
       <div className="grid gap-5">
@@ -54,6 +61,27 @@ export default async function AdminFilesPage({
         <FilesTable files={files} />
       </div>
     </AdminShell>
+  );
+}
+
+function normalizeQuery(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function findExactFileMatch(files: AdminFileRecord[], query?: string) {
+  if (!query?.trim()) {
+    return null;
+  }
+
+  const normalizedQuery = normalizeQuery(query);
+
+  return (
+    files.find((file) => {
+      const fileNumber = normalizeQuery(file.fileNumber);
+      const numberPlate = normalizeQuery(file.numberPlate);
+
+      return normalizedQuery === fileNumber || normalizedQuery === numberPlate;
+    }) ?? null
   );
 }
 
