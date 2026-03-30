@@ -5,6 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronRight, FileImage, FileText, UserRound, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { UploadSourceButton } from "@/components/admin/upload-source-button";
+import {
+  normalizeCarPhotoUpload,
+  normalizeDocumentUpload,
+} from "@/lib/client-image-upload";
 import type { Listing } from "@/types";
 
 type ListingFormProps = {
@@ -23,6 +27,8 @@ type FormSubmitState = {
 const stepOrder: Step[] = ["seller", "car", "buyer"];
 const documentAccept = ".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx";
 const photoAccept = ".jpg,.jpeg,.png,.webp,.heic,.heif";
+const DOCUMENT_MAX_BYTES = 12 * 1024 * 1024;
+const PHOTO_MAX_BYTES = 15 * 1024 * 1024;
 const uploadFieldNames = [
   "document_seller_id",
   "images",
@@ -438,7 +444,9 @@ export function ListingForm({ listing }: ListingFormProps) {
 
       if (!contentType.includes("application/json")) {
         throw new Error(
-          `${label} upload failed for ${fileName}. The server returned an unexpected response.`,
+          response.status === 413
+            ? `${label} upload failed for ${fileName}. File is too large for mobile upload.`
+            : `${label} upload failed for ${fileName}. The server returned an unexpected response.`,
         );
       }
 
@@ -462,6 +470,43 @@ export function ListingForm({ listing }: ListingFormProps) {
       }
 
       for (const file of files) {
+        let preparedFile = file;
+
+        try {
+          preparedFile =
+            plan.field === "images"
+              ? await normalizeCarPhotoUpload(file)
+              : await normalizeDocumentUpload(file);
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? `${plan.label} upload failed for ${file.name}. ${error.message}`
+              : `${plan.label} upload failed for ${file.name}.`;
+          failedUploads.push(message);
+          console.error("Create File preprocessing failed", {
+            listingId,
+            label: plan.label,
+            fileName: file.name,
+            message,
+          });
+          continue;
+        }
+
+        const maxBytes = plan.field === "images" ? PHOTO_MAX_BYTES : DOCUMENT_MAX_BYTES;
+
+        if (preparedFile.size > maxBytes) {
+          const message = `${plan.label} upload failed for ${file.name}. File is too large after processing.`;
+          failedUploads.push(message);
+          console.error("Create File upload skipped for oversize file", {
+            listingId,
+            label: plan.label,
+            fileName: file.name,
+            originalSize: file.size,
+            preparedSize: preparedFile.size,
+          });
+          continue;
+        }
+
         const uploadPayload = new FormData();
         uploadPayload.append("listingId", listingId);
 
@@ -469,7 +514,7 @@ export function ListingForm({ listing }: ListingFormProps) {
           uploadPayload.append(key, value);
         });
 
-        uploadPayload.append(plan.filesField, file);
+        uploadPayload.append(plan.filesField, preparedFile);
         try {
           await uploadSingleFile(plan.endpoint, uploadPayload, plan.label, file.name);
         } catch (error) {

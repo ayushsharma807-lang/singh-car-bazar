@@ -23,6 +23,12 @@ import {
   updateCarInfoAction,
   updateSellerInfoAction,
 } from "@/app/admin/actions";
+import {
+  isHeicLikeUpload,
+  isImageLikeUpload,
+  normalizeCarPhotoUpload,
+  normalizeDocumentUpload,
+} from "@/lib/client-image-upload";
 
 type FileStep = "seller" | "car" | "buyer";
 
@@ -96,6 +102,7 @@ const carDocumentGroups = [
 
 const PHOTO_MAX_BYTES = 15 * 1024 * 1024;
 const DOCUMENT_MAX_BYTES = 12 * 1024 * 1024;
+const RAW_IMAGE_UPLOAD_MAX_BYTES = 35 * 1024 * 1024;
 const PHOTO_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"];
 const DOCUMENT_EXTENSIONS = [
   ".pdf",
@@ -368,109 +375,6 @@ function updateQueueItem(
   return items.map((item) => (item.id === id ? { ...item, ...patch } : item));
 }
 
-async function loadImageFromFile(file: File) {
-  const objectUrl = URL.createObjectURL(file);
-
-  try {
-    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new window.Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("Image could not be read."));
-      img.src = objectUrl;
-    });
-
-    return image;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-}
-
-function isHeicPhoto(file: File) {
-  const lowerName = file.name.toLowerCase();
-  const lowerType = file.type.toLowerCase();
-
-  return (
-    lowerType === "image/heic" ||
-    lowerType === "image/heif" ||
-    lowerName.endsWith(".heic") ||
-    lowerName.endsWith(".heif")
-  );
-}
-
-async function convertHeicPhoto(file: File) {
-  const heic2anyModule = await import("heic2any");
-  const heic2any = (heic2anyModule.default ?? heic2anyModule) as (options: {
-    blob: Blob;
-    toType: string;
-    quality?: number;
-  }) => Promise<Blob | Blob[]>;
-  const converted = await heic2any({
-    blob: file,
-    toType: "image/jpeg",
-    quality: 0.88,
-  });
-  const nextBlob = Array.isArray(converted) ? converted[0] : converted;
-
-  if (!nextBlob) {
-    throw new Error("HEIC photo could not be converted. Please use JPG or PNG.");
-  }
-
-  const nextName = file.name.replace(/\.[^.]+$/, "") || "photo";
-  return new File([nextBlob], `${nextName}.jpg`, {
-    type: "image/jpeg",
-    lastModified: Date.now(),
-  });
-}
-
-async function compressCarPhoto(file: File) {
-  const normalizedFile = isHeicPhoto(file) ? await convertHeicPhoto(file) : file;
-  const canCompress = ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(
-    normalizedFile.type.toLowerCase(),
-  );
-
-  if (!canCompress) {
-    return normalizedFile;
-  }
-
-  try {
-    const image = await loadImageFromFile(normalizedFile);
-    const maxWidth = 1600;
-    const scale = Math.min(1, maxWidth / image.width);
-    const targetWidth = Math.max(1, Math.round(image.width * scale));
-    const targetHeight = Math.max(1, Math.round(image.height * scale));
-
-    const canvas = document.createElement("canvas");
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-
-    const context = canvas.getContext("2d");
-
-    if (!context) {
-      return file;
-    }
-
-    context.drawImage(image, 0, 0, targetWidth, targetHeight);
-
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, "image/jpeg", 0.82);
-    });
-
-    if (!blob || blob.size >= normalizedFile.size) {
-      return normalizedFile;
-    }
-
-    const nextName = normalizedFile.name.replace(/\.[^.]+$/, "") || "photo";
-
-    return new File([blob], `${nextName}.jpg`, {
-      type: "image/jpeg",
-      lastModified: Date.now(),
-    });
-  } catch (error) {
-    console.error("Photo compression failed", error);
-    return normalizedFile;
-  }
-}
-
 function UploadPicker({
   listingId,
   buttonLabel,
@@ -532,18 +436,23 @@ function UploadPicker({
             const lowerName = file.name.toLowerCase();
             const validExtension =
               DOCUMENT_EXTENSIONS.some((extension) => lowerName.endsWith(extension)) ||
-              file.type.toLowerCase().startsWith("image/");
-            return !validExtension || file.size > DOCUMENT_MAX_BYTES;
+              isImageLikeUpload(file);
+            const rawSizeLimit = isImageLikeUpload(file)
+              ? RAW_IMAGE_UPLOAD_MAX_BYTES
+              : DOCUMENT_MAX_BYTES;
+            return !validExtension || file.size > rawSizeLimit;
           });
 
           if (invalidFile) {
             const lowerName = invalidFile.name.toLowerCase();
             const validExtension =
               DOCUMENT_EXTENSIONS.some((extension) => lowerName.endsWith(extension)) ||
-              invalidFile.type.toLowerCase().startsWith("image/");
+              isImageLikeUpload(invalidFile);
             const message = !validExtension
               ? "Unsupported format. Use PDF, JPG, PNG, WEBP, HEIC, HEIF, DOC, or DOCX."
-              : `File too large. Limit is ${formatFileSize(DOCUMENT_MAX_BYTES)}.`;
+              : `File too large. Limit is ${formatFileSize(
+                  isImageLikeUpload(invalidFile) ? RAW_IMAGE_UPLOAD_MAX_BYTES : DOCUMENT_MAX_BYTES,
+                )}.`;
 
             setFeedback({
               tone: "error",
@@ -579,6 +488,14 @@ function UploadPicker({
               }
 
               try {
+                const normalizedFile = await normalizeDocumentUpload(file);
+
+                if (normalizedFile.size > DOCUMENT_MAX_BYTES) {
+                  throw new Error(
+                    `File is still too large after processing. Limit is ${formatFileSize(DOCUMENT_MAX_BYTES)}.`,
+                  );
+                }
+
                 setFeedback({
                   tone: "idle",
                   message: `Uploading ${index + 1} of ${queuedItems.length}...`,
@@ -586,14 +503,15 @@ function UploadPicker({
                 setQueue((current) =>
                   updateQueueItem(current, queueItem.id, {
                     status: "uploading",
-                    message: "Uploading...",
+                    message:
+                      normalizedFile.size < file.size ? "Preparing and uploading..." : "Uploading...",
                   }),
                 );
 
                 const payload = new FormData();
                 payload.append("listingId", listingId);
                 payload.append("docType", docType);
-                payload.append("files", file);
+                payload.append("files", normalizedFile);
 
                 const response = await fetch("/api/admin/upload-documents", {
                   method: "POST",
@@ -637,7 +555,10 @@ function UploadPicker({
                 setQueue((current) =>
                   updateQueueItem(current, queueItem.id, {
                     status: "success",
-                    message: "Uploaded",
+                    message:
+                      normalizedFile.size < file.size
+                        ? `Uploaded (${formatFileSize(file.size)} -> ${formatFileSize(normalizedFile.size)})`
+                        : "Uploaded",
                   }),
                 );
                 onSuccess?.({
@@ -794,18 +715,18 @@ function ApiUploadPicker({
             const lowerName = file.name.toLowerCase();
             const validExtension =
               PHOTO_EXTENSIONS.some((extension) => lowerName.endsWith(extension)) ||
-              file.type.toLowerCase().startsWith("image/");
-            return !validExtension || file.size > PHOTO_MAX_BYTES;
+              isImageLikeUpload(file);
+            return !validExtension || file.size > RAW_IMAGE_UPLOAD_MAX_BYTES;
           });
 
           if (invalidFile) {
             const lowerName = invalidFile.name.toLowerCase();
             const validExtension =
               PHOTO_EXTENSIONS.some((extension) => lowerName.endsWith(extension)) ||
-              invalidFile.type.toLowerCase().startsWith("image/");
+              isImageLikeUpload(invalidFile);
             const message = !validExtension
               ? "Unsupported format. Use JPG, JPEG, PNG, WEBP, HEIC, or HEIF."
-              : `File too large. Limit is ${formatFileSize(PHOTO_MAX_BYTES)}.`;
+              : `File too large. Limit is ${formatFileSize(RAW_IMAGE_UPLOAD_MAX_BYTES)}.`;
 
             setFeedback({
               tone: "error",
@@ -850,13 +771,19 @@ function ApiUploadPicker({
                   setQueue((current) =>
                     updateQueueItem(current, queueItem.id, {
                       status: "uploading",
-                      message: isHeicPhoto(file)
+                      message: isHeicLikeUpload(file)
                         ? "Converting and uploading..."
                         : "Compressing and uploading...",
                     }),
                   );
 
-                  const compressedFile = await compressCarPhoto(file);
+                  const compressedFile = await normalizeCarPhotoUpload(file);
+
+                  if (compressedFile.size > PHOTO_MAX_BYTES) {
+                    throw new Error(
+                      `Photo is still too large after processing. Limit is ${formatFileSize(PHOTO_MAX_BYTES)}.`,
+                    );
+                  }
                   const payload = new FormData();
                   payload.append("listingId", listingId);
                   payload.append("images", compressedFile);

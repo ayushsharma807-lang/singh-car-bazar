@@ -193,10 +193,17 @@ export async function POST(request: Request) {
       const uploadResult = await uploadFileWithResult("documents", path, file);
 
       if (!uploadResult.publicUrl) {
+        console.error("Document storage upload failed", {
+          listingId,
+          docType,
+          fileName: file.name,
+          path,
+          error: uploadResult.error,
+        });
         return NextResponse.json(
           {
             success: false,
-            message: `${docType} upload failed: ${file.name}`,
+            message: `${docType} upload failed: ${file.name}. ${uploadResult.error || "Storage upload failed."}`,
           },
           { status: 500 },
         );
@@ -219,6 +226,13 @@ export async function POST(request: Request) {
         .single();
 
       if (documentError || !insertedDocument) {
+        console.error("Document database save failed", {
+          listingId,
+          docType,
+          fileName: file.name,
+          fileUrl: uploadResult.publicUrl,
+          error: documentError?.message || "Unknown error",
+        });
         return NextResponse.json(
           {
             success: false,
@@ -246,6 +260,7 @@ export async function POST(request: Request) {
       documents: uploadedDocuments,
     });
   } catch (error) {
+    console.error("Document upload route crashed", error);
     return NextResponse.json(
       {
         success: false,
