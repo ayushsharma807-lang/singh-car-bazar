@@ -347,10 +347,13 @@ export function ListingForm({ listing }: ListingFormProps) {
     const make = readField("make");
     const model = readField("model");
     const numberPlate = readField("numberPlate");
+    const year = readField("year");
+    const fuel = readField("fuel");
+    const transmission = readField("transmission");
     const price = readField("price");
 
-    if (!make || !model || !numberPlate || !price) {
-      setLocalMessage("Add car name, number plate, and price first.");
+    if (!make || !model || !numberPlate || !year || !fuel || !transmission || !price) {
+      setLocalMessage("Add car name, number plate, year, fuel, gear, and price first.");
       return;
     }
 
@@ -652,6 +655,18 @@ export function ListingForm({ listing }: ListingFormProps) {
               <FieldLabel>Price</FieldLabel>
               <input className="admin-field h-12" type="number" name="price" defaultValue={listing?.price ?? ""} placeholder="Price" />
             </label>
+            <label>
+              <FieldLabel>Year</FieldLabel>
+              <input className="admin-field h-12" type="number" name="year" defaultValue={listing?.year ?? ""} placeholder="Year" />
+            </label>
+            <label>
+              <FieldLabel>Fuel</FieldLabel>
+              <input className="admin-field h-12" name="fuel" defaultValue={listing?.fuel ?? ""} placeholder="Petrol, diesel..." />
+            </label>
+            <label>
+              <FieldLabel>Gear</FieldLabel>
+              <input className="admin-field h-12" name="transmission" defaultValue={listing?.transmission ?? ""} placeholder="Manual or automatic" />
+            </label>
 
             <details className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <summary className="cursor-pointer text-sm font-semibold text-black">Optional details</summary>
@@ -661,20 +676,8 @@ export function ListingForm({ listing }: ListingFormProps) {
                   <input className="admin-field h-12" name="variant" defaultValue={listing?.variant ?? ""} placeholder="Optional model type" />
                 </label>
                 <label>
-                  <FieldLabel>Year</FieldLabel>
-                  <input className="admin-field h-12" type="number" name="year" defaultValue={listing?.year ?? ""} placeholder="Year" />
-                </label>
-                <label>
                   <FieldLabel>KM</FieldLabel>
                   <input className="admin-field h-12" type="number" name="kmDriven" defaultValue={listing?.kmDriven ?? ""} placeholder="KM driven" />
-                </label>
-                <label>
-                  <FieldLabel>Fuel</FieldLabel>
-                  <input className="admin-field h-12" name="fuel" defaultValue={listing?.fuel ?? ""} placeholder="Petrol, diesel..." />
-                </label>
-                <label>
-                  <FieldLabel>Gear</FieldLabel>
-                  <input className="admin-field h-12" name="transmission" defaultValue={listing?.transmission ?? ""} placeholder="Manual or automatic" />
                 </label>
                 <label>
                   <FieldLabel>Owner Count</FieldLabel>

@@ -297,7 +297,7 @@ export async function POST(request: Request) {
     }
 
     if (!make || !model || !numberPlate || !fuel || !transmission || !year) {
-      return jsonError("Please fill the main car details before saving.");
+      return jsonError("Please add car name, number plate, year, fuel, gear, and price before saving.");
     }
 
     if (!price && price !== 0) {

@@ -394,7 +394,7 @@ export async function saveListingAction(
   if (!make || !model || !numberPlate || !fuel || !transmission || !year) {
     return {
       status: "error",
-      message: "Please fill the main car details before saving.",
+      message: "Please add car name, number plate, year, fuel, gear, and price before saving.",
     };
   }
 
