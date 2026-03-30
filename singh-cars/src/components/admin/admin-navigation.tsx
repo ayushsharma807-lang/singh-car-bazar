@@ -89,19 +89,22 @@ export function MobileBottomNav({ items }: { items: NavItem[] }) {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold transition",
-                isActive ? "bg-black text-white" : "text-gray-600 hover:bg-gray-100 hover:text-black",
+                "flex flex-col items-center justify-center gap-1 rounded-xl border px-3 py-2.5 text-[11px] font-semibold transition",
+                isActive
+                  ? "border-gray-200 bg-gray-100 text-gray-900 shadow-sm"
+                  : "border-transparent bg-transparent text-gray-500 hover:border-gray-200 hover:bg-gray-50 hover:text-gray-900",
               )}
             >
               <div className="relative">
-                <Icon className="h-4 w-4" />
+                <Icon className="h-5 w-5" />
                 {typeof item.count === "number" && item.count > 0 ? (
                   <span
                     className={cn(
                       "absolute -right-3 -top-2 rounded-full border px-1.5 py-0.5 text-[10px] leading-none",
                       isActive
-                        ? "border-white/30 bg-white/10 text-white"
+                        ? "border-gray-300 bg-white text-gray-900"
                         : "border-gray-200 bg-white text-gray-700",
                     )}
                   >

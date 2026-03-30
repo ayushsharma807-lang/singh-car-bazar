@@ -922,12 +922,8 @@ function StepShell({
 }) {
   return (
     <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full flex-col gap-4 px-5 py-5 text-left transition hover:bg-gray-50 md:flex-row md:items-center md:justify-between"
-      >
-        <div className="min-w-0">
+      <div className="flex w-full flex-col gap-4 px-5 py-5 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-black">
               {icon}
@@ -940,11 +936,16 @@ function StepShell({
         </div>
         <div className="flex items-center gap-3">
           <span className="admin-btn h-12 px-5 text-sm">{stateLabel || actionLabel}</span>
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-black">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={isOpen ? `Collapse ${title}` : `Expand ${title}`}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-black transition hover:bg-gray-50 active:scale-[0.98]"
+          >
             <ChevronDown className={`h-5 w-5 transition ${isOpen ? "rotate-180" : ""}`} />
-          </span>
+          </button>
         </div>
-      </button>
+      </div>
 
       {isOpen ? <div className="border-t border-gray-200 px-5 py-5">{children}</div> : null}
     </section>
@@ -1312,7 +1313,7 @@ export function FileWorkspace({
     : !sellerDone
       ? "seller"
       : "car";
-  const [activeStep, setActiveStep] = useState<FileStep>(defaultStep);
+  const [activeStep, setActiveStep] = useState<FileStep | null>(defaultStep);
   const [editingStep, setEditingStep] = useState<FileStep | null>(
     !sellerDone ? "seller" : !carDone ? "car" : showBuyerStep && !buyerDone ? "buyer" : null,
   );
@@ -1337,6 +1338,16 @@ export function FileWorkspace({
     window.setTimeout(() => {
       nextRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 120);
+  }
+
+  function toggleStep(step: FileStep, editWhenOpening = false) {
+    if (activeStep === step) {
+      setActiveStep(null);
+      setEditingStep(null);
+      return;
+    }
+
+    openStep(step, editWhenOpening);
   }
 
   useEffect(() => {
@@ -1407,7 +1418,7 @@ export function FileWorkspace({
         stateLabel={sellerDone ? "Done" : "Add Info"}
         actionLabel={sellerDone ? "Done" : "+ Add Seller"}
         isOpen={activeStep === "seller"}
-        onToggle={() => openStep("seller", !sellerDone)}
+        onToggle={() => toggleStep("seller", !sellerDone)}
       >
         {isSellerEditing ? (
           <form action={updateSellerInfoAction} className="grid gap-4">
@@ -1622,7 +1633,7 @@ export function FileWorkspace({
         stateLabel={carDone ? "Done" : "Add Info"}
         actionLabel={carDone ? "Done" : "+ Add Car"}
         isOpen={activeStep === "car"}
-        onToggle={() => openStep("car", !carDone)}
+        onToggle={() => toggleStep("car", !carDone)}
       >
         {isCarEditing ? (
           <form action={updateCarInfoAction} className="grid gap-4">
@@ -2173,7 +2184,7 @@ export function FileWorkspace({
           stateLabel={buyerDone ? "Done" : "Add Info"}
           actionLabel={buyerDone ? "Done" : "+ Add Buyer"}
           isOpen={activeStep === "buyer"}
-          onToggle={() => openStep("buyer", !buyerDone)}
+          onToggle={() => toggleStep("buyer", !buyerDone)}
         >
           {isBuyerEditing ? (
             <form action={updateBuyerInfoAction} className="grid gap-4">
