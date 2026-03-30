@@ -1,9 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ChevronRight, FileImage, FileText, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { saveListingAction, type SaveListingActionState } from "@/app/admin/actions";
 import type { Listing } from "@/types";
 
 type ListingFormProps = {
@@ -11,6 +11,12 @@ type ListingFormProps = {
 };
 
 type Step = "seller" | "car" | "buyer";
+
+type FormSubmitState = {
+  status: "idle" | "success" | "error";
+  message?: string;
+  redirectTo?: string;
+};
 
 const stepOrder: Step[] = ["seller", "car", "buyer"];
 const documentAccept = ".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx";
@@ -39,7 +45,7 @@ const stepMeta: Record<Step, { title: string; text: string; icon: typeof UserRou
   },
 };
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
+function FieldLabel({ children }: { children: ReactNode }) {
   return <span className="mb-2 block text-sm font-semibold text-gray-800">{children}</span>;
 }
 
@@ -145,8 +151,8 @@ export function ListingForm({ listing }: ListingFormProps) {
   const isEditing = Boolean(listing);
   const defaultStatus = listing?.status ?? "available";
   const buyerDraft = parseBuyerNotes(listing?.buyer?.notes);
-  const initialState: SaveListingActionState = { status: "idle" };
-  const [state, formAction, isPending] = useActionState(saveListingAction, initialState);
+  const [state, setState] = useState<FormSubmitState>({ status: "idle" });
+  const [isPending, setIsPending] = useState(false);
   const [step, setStep] = useState<Step>("seller");
   const [localMessage, setLocalMessage] = useState<string>("");
   const [selectedFiles, setSelectedFiles] = useState<Record<string, string>>({});
@@ -222,10 +228,65 @@ export function ListingForm({ listing }: ListingFormProps) {
     goToStep("buyer");
   }
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!formRef.current || isPending) {
+      return;
+    }
+
+    setLocalMessage("");
+    setState({ status: "idle" });
+    setIsPending(true);
+
+    try {
+      const response = await fetch("/api/admin/create-file", {
+        method: "POST",
+        body: new FormData(formRef.current),
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!contentType.includes("application/json")) {
+        throw new Error("An unexpected response was received from the server.");
+      }
+
+      const result = (await response.json()) as {
+        success?: boolean;
+        message?: string;
+        redirectTo?: string;
+      };
+
+      if (!response.ok || !result.success) {
+        setState({
+          status: "error",
+          message: result.message || "Could not create file. Please try again.",
+        });
+        return;
+      }
+
+      setState({
+        status: "success",
+        message: result.message || "Car saved successfully.",
+        redirectTo: result.redirectTo || "/admin",
+      });
+    } catch (error) {
+      setState({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Could not create file. Please try again.",
+      });
+    } finally {
+      setIsPending(false);
+    }
+  }
+
   return (
     <form
       ref={formRef}
-      action={formAction}
+      onSubmit={handleSubmit}
       className="grid gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"
     >
       <input type="hidden" name="listingId" value={listing?.id ?? ""} />
@@ -303,9 +364,10 @@ export function ListingForm({ listing }: ListingFormProps) {
             </label>
             <UploadCard
               label="Upload Seller Docs"
-              helper="Pick seller papers now. They upload when you save the file."
+              helper="Pick one or more seller papers now."
               name="document_seller_id"
               accept={documentAccept}
+              multiple
               selectedText={selectedFiles.document_seller_id}
               onFilesChange={updateFileLabel}
             />
@@ -413,9 +475,10 @@ export function ListingForm({ listing }: ListingFormProps) {
                 <UploadCard
                   key={field.name}
                   label={`Upload ${field.label}`}
-                  helper={`Add ${field.label.toLowerCase()} papers`}
+                  helper={`Add one or more ${field.label.toLowerCase()} papers`}
                   name={field.name}
                   accept={field.accept}
+                  multiple
                   selectedText={selectedFiles[field.name]}
                   onFilesChange={updateFileLabel}
                 />
@@ -482,9 +545,10 @@ export function ListingForm({ listing }: ListingFormProps) {
 
             <UploadCard
               label="Upload Buyer Docs"
-              helper="Pick buyer papers now. They upload when you save the file."
+              helper="Pick one or more buyer papers now."
               name="document_buyer_id"
               accept={documentAccept}
+              multiple
               selectedText={selectedFiles.document_buyer_id}
               onFilesChange={updateFileLabel}
             />
