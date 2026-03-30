@@ -15,7 +15,6 @@ import {
 import type { AdminFileRecord, ListingDocument, ListingImage } from "@/types";
 import { UploadSourceButton } from "@/components/admin/upload-source-button";
 import {
-  uploadDocumentInlineAction,
   uploadListingImagesInlineAction,
   removeDocumentByIdAction,
   removeListingImageByIdAction,
@@ -594,10 +593,35 @@ function UploadPicker({
                 const payload = new FormData();
                 payload.append("listingId", listingId);
                 payload.append("docType", docType);
-                payload.append("file", file);
-                const result = await uploadDocumentInlineAction(payload);
+                payload.append("files", file);
 
-                if (!result.success || !result.documentId || !result.fileUrl) {
+                const response = await fetch("/api/admin/upload-documents", {
+                  method: "POST",
+                  body: payload,
+                });
+                const contentType = response.headers.get("content-type") || "";
+
+                if (!contentType.includes("application/json")) {
+                  throw new Error(
+                    "Document upload failed. The server returned an unexpected response.",
+                  );
+                }
+
+                const result = (await response.json()) as {
+                  success?: boolean;
+                  message?: string;
+                  documents?: Array<{
+                    id: string;
+                    listingId: string;
+                    docType: string;
+                    fileUrl: string;
+                    notes: string | null;
+                  }>;
+                };
+
+                const uploadedDocument = result.documents?.[0];
+
+                if (!response.ok || !result.success || !uploadedDocument?.id || !uploadedDocument.fileUrl) {
                   const message = result.message || "Document upload failed.";
                   setQueue((current) =>
                     updateQueueItem(current, queueItem.id, {
@@ -616,7 +640,15 @@ function UploadPicker({
                     message: "Uploaded",
                   }),
                 );
-                onSuccess?.(result);
+                onSuccess?.({
+                  success: true,
+                  message: result.message || `${file.name} uploaded successfully.`,
+                  documentId: uploadedDocument.id,
+                  fileName: file.name,
+                  fileUrl: uploadedDocument.fileUrl,
+                  docType: uploadedDocument.docType,
+                  notes: uploadedDocument.notes || undefined,
+                });
               } catch (error) {
                 console.error("Document upload failed", {
                   listingId,
